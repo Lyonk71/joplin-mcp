@@ -39,11 +39,6 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Update package version
-        run: |
-          VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')
-          npm version $VERSION --no-git-tag-version
-
       - name: Determine npm tag
         id: npm-tag
         run: |
