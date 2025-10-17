@@ -44,8 +44,19 @@ jobs:
           VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')
           npm version $VERSION --no-git-tag-version
 
+      - name: Determine npm tag
+        id: npm-tag
+        run: |
+          if [[ "${{ github.ref_name }}" == *"beta"* ]]; then
+            echo "tag=beta" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -53,7 +64,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.npm-tag.outputs.prerelease }}" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
           gh release create ${{ github.ref_name }} \
              --generate-notes \
              --title "Release ${{ github.ref_name }}" \
-             --notes "Published to npm: https://www.npmjs.com/package/joplin-mcp"
+             --notes "Published to npm as \`${{ steps.npm-tag.outputs.tag }}\`: https://www.npmjs.com/package/joplin-mcp" \
+             $PRERELEASE_FLAG
