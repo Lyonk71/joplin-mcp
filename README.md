@@ -93,22 +93,13 @@ To get your Joplin API token:
 
 ## Available Tools
 
-The MCP server provides these tools to AI assistants:
+The MCP server exposes these tool endpoints:
 
-- `search_notes` - Search for notes by various criteria
-- `get_note` - Retrieve a specific note by ID
-- `create_note` - Create a new note
-- `update_note` - Update an existing note
-- `delete_note` - Delete a note
-- `list_notebooks` - List all notebooks
-- `create_notebook` - Create a new notebook
-- `list_tags` - List all tags
-- `create_tag` - Create a new tag
-- `add_tag_to_note` - Add a tag to a note
-- `remove_tag_from_note` - Remove a tag from a note
-- `attach_resource` - Attach a file or image to a note
-- `list_note_revisions` - List all revisions of a note
-- `get_note_revision` - Get a specific revision of a note
+- **Notebooks** `list_notebooks`, `create_notebook`, `get_notebook_notes`, `update_notebook`, `delete_notebook`, `get_notebook_by_id`, `move_note_to_notebook`
+- **Notes** `list_all_notes`, `search_notes`, `get_note`, `create_note`, `update_note`, `append_to_note`, `prepend_to_note`, `delete_note`
+- **Tags** `add_tags_to_note`, `remove_tags_from_note`, `list_tags`, `rename_tag`, `delete_tag`, `get_tag_by_id`, `get_notes_by_tag`
+- **Resources** `list_all_resources`, `get_resource_metadata`, `get_note_attachments`, `get_resource_notes`, `download_attachment`, `upload_attachment`, `update_resource`, `delete_resource`
+- **Revisions** `list_all_revisions`, `get_revision`
 
 ## Development
 
