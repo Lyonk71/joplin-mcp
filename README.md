@@ -136,6 +136,56 @@ npm run format
 npm run lint
 ```
 
+## Releasing
+
+This project uses automated npm publishing via GitHub Actions with npm's Trusted Publishers (OIDC).
+
+### One-Time Setup
+
+Configure npm Trusted Publisher (maintainers only):
+
+1. Go to https://www.npmjs.com/package/joplin-mcp/access
+2. Click "Automated Publishing" → "Add Trusted Publisher"
+3. Select "GitHub Actions"
+4. Enter:
+   - **Repository owner**: `Lyonk71`
+   - **Repository name**: `joplin-mcp`
+   - **Workflow file**: `publish.yaml`
+   - **Environment**: (leave empty)
+
+### Creating Releases
+
+**For stable releases:**
+
+```bash
+npm run release:patch   # 1.0.0 → 1.0.1 (bug fixes)
+npm run release:minor   # 1.0.0 → 1.1.0 (new features)
+npm run release:major   # 1.0.0 → 2.0.0 (breaking changes)
+git push && git push --tags
+```
+
+**For beta releases:**
+
+```bash
+npm run release:beta    # 1.0.0 → 1.0.1-beta.0
+git push && git push --tags
+```
+
+**To promote a tested beta to stable:**
+
+```bash
+git checkout v1.1.0-beta.0   # Checkout tested beta
+git tag v1.1.0               # Tag without -beta suffix
+git push origin v1.1.0       # Publishes to latest
+```
+
+The GitHub Action automatically:
+
+- Runs tests, typecheck, and linting
+- Builds the project
+- Publishes to npm (`latest` or `beta` channel based on version)
+- Creates a GitHub release
+
 ## Troubleshooting
 
 ### Connection Issues
