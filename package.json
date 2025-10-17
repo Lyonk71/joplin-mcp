@@ -1,6 +1,6 @@
 {
   "name": "joplin-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "Model Context Protocol (MCP) server for Joplin note-taking app",
   "main": "dist/index.js",
