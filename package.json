@@ -29,7 +29,11 @@
     "lint": "eslint . --fix",
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --max-warnings 0",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "release:patch": "npm version patch -m 'Release %s'",
+    "release:minor": "npm version minor -m 'Release %s'",
+    "release:major": "npm version major -m 'Release %s'",
+    "release:beta": "npm version prerelease --preid=beta -m 'Release %s'"
   },
   "keywords": [
     "mcp",
