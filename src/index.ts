@@ -7,8 +7,11 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { join, resolve } from 'path';
+import { existsSync, readFileSync, realpathSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { program } from 'commander';
+import { getVersion } from './version.js';
 
 /**
  * Joplin API paginated response format
@@ -826,7 +829,7 @@ export class JoplinServer {
     this.server = new Server(
       {
         name: 'joplin-server',
-        version: '0.1.0',
+        version: getVersion(),
       },
       {
         capabilities: {
@@ -840,213 +843,219 @@ export class JoplinServer {
     this.setupErrorHandling();
   }
 
-  private setupToolHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: [
-          // Notebook Management
-          {
-            name: 'list_notebooks',
-            description:
-              'List all notebooks (folders) in Joplin. Returns notebook ID, title, parent ID, and timestamps. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time,user_created_time,user_updated_time',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=title, order_dir=ASC for alphabetical',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-            },
-          },
-          {
-            name: 'create_notebook',
-            description:
-              'Create a new notebook in Joplin. Optionally nest it under a parent notebook.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                title: {
-                  type: 'string',
-                  description: 'The title of the new notebook',
-                },
-                parent_id: {
-                  type: 'string',
-                  description:
-                    'Optional: ID of the parent notebook for nesting',
-                },
-              },
-              required: ['title'],
-            },
-          },
-          {
-            name: 'get_notebook_notes',
-            description:
-              'Get all notes from a specific notebook. Returns note titles, IDs, and metadata. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                notebook_id: {
-                  type: 'string',
-                  description: 'The ID of the notebook',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-              required: ['notebook_id'],
-            },
-          },
-          {
-            name: 'update_notebook',
-            description:
-              'Update notebook properties (rename or move to different parent).',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                notebook_id: {
-                  type: 'string',
-                  description: 'The ID of the notebook to update',
-                },
-                title: {
-                  type: 'string',
-                  description: 'Optional: New title for the notebook',
-                },
-                parent_id: {
-                  type: 'string',
-                  description: 'Optional: New parent notebook ID (for nesting)',
-                },
-              },
-              required: ['notebook_id'],
-            },
-          },
-          {
-            name: 'delete_notebook',
-            description: 'Delete a notebook. The notebook must be empty.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                notebook_id: {
-                  type: 'string',
-                  description: 'The ID of the notebook to delete',
-                },
-              },
-              required: ['notebook_id'],
-            },
-          },
-          {
-            name: 'get_notebook_by_id',
-            description:
-              'Get a specific notebook by ID. Returns notebook title, parent_id, and timestamps.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                notebook_id: {
-                  type: 'string',
-                  description: 'The ID of the notebook',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time,user_created_time,user_updated_time',
-                },
-              },
-              required: ['notebook_id'],
-            },
-          },
-          {
-            name: 'move_note_to_notebook',
-            description: 'Move a note to a different notebook.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note to move',
-                },
-                notebook_id: {
-                  type: 'string',
-                  description: 'The ID of the destination notebook',
-                },
-              },
-              required: ['note_id', 'notebook_id'],
-            },
-          },
+  /**
+   * Get the complete tools definitions array
+   * This is used both for the MCP ListTools handler and for TOML generation
+   */
+  private getToolsDefinitions() {
+    return [
+      // Notebook Management
+      {
+        name: 'list_notebooks',
+        description: `List all notebooks (folders) in Joplin.
 
-          // Note Operations
-          {
-            name: 'list_all_notes',
-            description:
-              'List all notes across all notebooks. Returns note titles, IDs, content, and metadata. Optionally include deleted notes, customize fields, and sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
-                },
-                include_deleted: {
-                  type: 'boolean',
-                  description: 'Include deleted notes (default: false)',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=updated_time, order_dir=DESC for most recent first',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
+STRATEGIC GUIDANCE: This is often the first tool to call when a user wants to create a note in a specific notebook or browse their notebook structure. The returned IDs are needed for create_note, move_note_to_notebook, and other notebook operations. Use the parent_id field to understand the notebook hierarchy.
+
+Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Supports optional sorting.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time,user_created_time,user_updated_time',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=title, order_dir=ASC for alphabetical',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
             },
           },
-          {
-            name: 'search_notes',
-            description: `Search for notes using Joplin's powerful query syntax.
+        },
+      },
+      {
+        name: 'create_notebook',
+        description:
+          'Create a new notebook in Joplin. Optionally nest it under a parent notebook.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'The title of the new notebook',
+            },
+            parent_id: {
+              type: 'string',
+              description: 'Optional: ID of the parent notebook for nesting',
+            },
+          },
+          required: ['title'],
+        },
+      },
+      {
+        name: 'get_notebook_notes',
+        description:
+          'Get all notes from a specific notebook. Returns note titles, IDs, and metadata. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            notebook_id: {
+              type: 'string',
+              description: 'The ID of the notebook',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+          required: ['notebook_id'],
+        },
+      },
+      {
+        name: 'update_notebook',
+        description:
+          'Update notebook properties (rename or move to different parent).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            notebook_id: {
+              type: 'string',
+              description: 'The ID of the notebook to update',
+            },
+            title: {
+              type: 'string',
+              description: 'Optional: New title for the notebook',
+            },
+            parent_id: {
+              type: 'string',
+              description: 'Optional: New parent notebook ID (for nesting)',
+            },
+          },
+          required: ['notebook_id'],
+        },
+      },
+      {
+        name: 'delete_notebook',
+        description: 'Delete a notebook. The notebook must be empty.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            notebook_id: {
+              type: 'string',
+              description: 'The ID of the notebook to delete',
+            },
+          },
+          required: ['notebook_id'],
+        },
+      },
+      {
+        name: 'get_notebook_by_id',
+        description:
+          'Get a specific notebook by ID. Returns notebook title, parent_id, and timestamps.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            notebook_id: {
+              type: 'string',
+              description: 'The ID of the notebook',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time,user_created_time,user_updated_time',
+            },
+          },
+          required: ['notebook_id'],
+        },
+      },
+      {
+        name: 'move_note_to_notebook',
+        description: 'Move a note to a different notebook.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note to move',
+            },
+            notebook_id: {
+              type: 'string',
+              description: 'The ID of the destination notebook',
+            },
+          },
+          required: ['note_id', 'notebook_id'],
+        },
+      },
+
+      // Note Operations
+      {
+        name: 'list_all_notes',
+        description:
+          'List all notes across all notebooks. Returns note titles, IDs, content, and metadata. Optionally include deleted notes, customize fields, and sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
+            },
+            include_deleted: {
+              type: 'boolean',
+              description: 'Include deleted notes (default: false)',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=updated_time, order_dir=DESC for most recent first',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+        },
+      },
+      {
+        name: 'search_notes',
+        description: `Search for notes using Joplin's powerful query syntax.
+
+STRATEGIC GUIDANCE: Default to broader searches first - a search that returns too many notes is better than one that returns zero. If a simple keyword search like "project" returns no results, do NOT immediately give up. Instead, try variations: search for "proj*" (wildcard), check if notes might use "initiative" or "plan" instead, or search within specific notebooks using the notebook: filter. Always expand your search strategy when initial queries return empty results.
 
 Basic syntax:
 - Single/multiple words: "linux kernel" (AND logic by default)
@@ -1079,600 +1088,614 @@ Examples:
 - Notes with images: "resource:image/*"
 - Exclude archived: "project -tag:archived"
 - Either/or search: "any:1 kubernetes docker"`,
-            inputSchema: {
-              type: 'object',
-              properties: {
-                query: {
-                  type: 'string',
-                  description: 'Search query (supports wildcards with *)',
-                },
-                type: {
-                  type: 'string',
-                  description: 'Optional: Filter by type (note, folder, tag)',
-                },
-              },
-              required: ['query'],
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search query (supports wildcards with *)',
+            },
+            type: {
+              type: 'string',
+              description: 'Optional: Filter by type (note, folder, tag)',
             },
           },
-          {
-            name: 'get_note',
-            description:
-              'Get the full content of a specific note by ID. Returns title, body (content), notebook, timestamps, and tags.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-              },
-              required: ['note_id'],
+          required: ['query'],
+        },
+      },
+      {
+        name: 'get_note',
+        description:
+          'Get the full content of a specific note by ID. Returns title, body (content), notebook, timestamps, and tags.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
             },
           },
-          {
-            name: 'create_note',
-            description:
-              'Create a new note with title and body content. Can create regular notes or todos with due dates. Optionally specify notebook and tags.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                title: {
-                  type: 'string',
-                  description: 'The title of the note',
-                },
-                body: {
-                  type: 'string',
-                  description: 'The content of the note (Markdown format)',
-                },
-                notebook_id: {
-                  type: 'string',
-                  description:
-                    'Optional: ID of the notebook to place the note in (defaults to default notebook)',
-                },
-                tags: {
-                  type: 'string',
-                  description: 'Optional: Comma-separated list of tag names',
-                },
-                is_todo: {
-                  type: 'number',
-                  description:
-                    'Optional: Set to 1 to create a todo item, 0 for regular note (default: 0)',
-                },
-                todo_due: {
-                  type: 'number',
-                  description:
-                    'Optional: Unix timestamp (in milliseconds) for when the todo is due. Only applicable when is_todo=1',
-                },
-                todo_completed: {
-                  type: 'number',
-                  description:
-                    'Optional: Unix timestamp (in milliseconds) for when the todo was completed. Only applicable when is_todo=1. Set to 0 for incomplete',
-                },
-              },
-              required: ['title', 'body'],
-            },
-          },
-          {
-            name: 'update_note',
-            description:
-              'Update an existing note. Can update title, body, notebook, or convert to/from todo. Use add_tags_to_note or remove_tags_from_note to modify tags.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note to update',
-                },
-                title: {
-                  type: 'string',
-                  description: 'Optional: New title for the note',
-                },
-                body: {
-                  type: 'string',
-                  description:
-                    'Optional: New body content (replaces existing content)',
-                },
-                notebook_id: {
-                  type: 'string',
-                  description: 'Optional: Move note to a different notebook',
-                },
-                is_todo: {
-                  type: 'number',
-                  description:
-                    'Optional: Set to 1 to convert to todo, 0 to convert to regular note',
-                },
-                todo_due: {
-                  type: 'number',
-                  description:
-                    'Optional: Unix timestamp (in milliseconds) for when the todo is due. Only applicable when is_todo=1',
-                },
-                todo_completed: {
-                  type: 'number',
-                  description:
-                    'Optional: Unix timestamp (in milliseconds) for when the todo was completed. Set to 0 to mark incomplete, or a timestamp to mark complete. Only applicable when is_todo=1',
-                },
-              },
-              required: ['note_id'],
-            },
-          },
-          {
-            name: 'append_to_note',
-            description: 'Append content to the end of an existing note.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-                content: {
-                  type: 'string',
-                  description: 'Content to append',
-                },
-              },
-              required: ['note_id', 'content'],
-            },
-          },
-          {
-            name: 'prepend_to_note',
-            description:
-              'Prepend content to the beginning of an existing note.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-                content: {
-                  type: 'string',
-                  description: 'Content to prepend',
-                },
-              },
-              required: ['note_id', 'content'],
-            },
-          },
-          {
-            name: 'delete_note',
-            description: 'Delete a note (moves it to the trash).',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note to delete',
-                },
-              },
-              required: ['note_id'],
-            },
-          },
+          required: ['note_id'],
+        },
+      },
+      {
+        name: 'create_note',
+        description: `Create a new note with title and body content.
 
-          // Tag Management
-          {
-            name: 'add_tags_to_note',
-            description:
-              "Add tags to an existing note. Tags will be created if they don't exist. Tags are added to any existing tags (not replaced).",
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-                tags: {
-                  type: 'string',
-                  description: 'Comma-separated list of tag names to add',
-                },
-              },
-              required: ['note_id', 'tags'],
-            },
-          },
-          {
-            name: 'remove_tags_from_note',
-            description:
-              "Remove specific tags from a note. Silently ignores tags that don't exist or aren't on the note.",
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-                tags: {
-                  type: 'string',
-                  description: 'Comma-separated list of tag names to remove',
-                },
-              },
-              required: ['note_id', 'tags'],
-            },
-          },
-          {
-            name: 'list_tags',
-            description:
-              'List all tags in Joplin. Returns tag IDs, names, and timestamps. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,created_time,updated_time',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=title, order_dir=ASC for alphabetical',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-            },
-          },
-          {
-            name: 'rename_tag',
-            description:
-              'Rename a tag. All notes with this tag will show the new name. Provide either tag_id or current_name.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                tag_id: {
-                  type: 'string',
-                  description:
-                    'The ID of the tag to rename (use this OR current_name)',
-                },
-                current_name: {
-                  type: 'string',
-                  description: 'Current name of the tag (use this OR tag_id)',
-                },
-                new_name: {
-                  type: 'string',
-                  description: 'New name for the tag',
-                },
-              },
-              required: ['new_name'],
-            },
-          },
-          {
-            name: 'delete_tag',
-            description:
-              'Delete a tag from Joplin. All notes will no longer have this tag.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                tag_id: {
-                  type: 'string',
-                  description: 'The ID of the tag to delete',
-                },
-              },
-              required: ['tag_id'],
-            },
-          },
-          {
-            name: 'get_tag_by_id',
-            description:
-              'Get a specific tag by ID. Returns tag title and timestamps.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                tag_id: {
-                  type: 'string',
-                  description: 'The ID of the tag',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,created_time,updated_time',
-                },
-              },
-              required: ['tag_id'],
-            },
-          },
-          {
-            name: 'get_notes_by_tag',
-            description:
-              'Get all notes that have a specific tag. Provide either tag_id or tag_name. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                tag_id: {
-                  type: 'string',
-                  description: 'The ID of the tag (use this OR tag_name)',
-                },
-                tag_name: {
-                  type: 'string',
-                  description: 'The name of the tag (use this OR tag_id)',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-            },
-          },
+STRATEGIC GUIDANCE: Before creating a note, use list_notebooks to discover the notebook_id if the user wants to place the note in a specific notebook. Tags specified in the tags parameter will be created automatically if they don't exist, so you don't need to check tag existence first. Markdown formatting is fully supported in the body field and should be used for better note structure.
 
-          // Resource Operations
-          {
-            name: 'list_all_resources',
-            description:
-              'List all file attachments (images, PDFs, etc.) across all notes. Returns metadata including OCR text if available. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,mime,filename,size,created_time,updated_time,file_extension,ocr_text,ocr_status',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, size (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=size, order_dir=DESC for largest first',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
+Supports creating regular notes or todo items with due dates. Can specify notebook placement and tags at creation time.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'The title of the note',
+            },
+            body: {
+              type: 'string',
+              description: 'The content of the note (Markdown format)',
+            },
+            notebook_id: {
+              type: 'string',
+              description:
+                'Optional: ID of the notebook to place the note in (defaults to default notebook)',
+            },
+            tags: {
+              type: 'string',
+              description: 'Optional: Comma-separated list of tag names',
+            },
+            is_todo: {
+              type: 'number',
+              description:
+                'Optional: Set to 1 to create a todo item, 0 for regular note (default: 0)',
+            },
+            todo_due: {
+              type: 'number',
+              description:
+                'Optional: Unix timestamp (in milliseconds) for when the todo is due. Only applicable when is_todo=1',
+            },
+            todo_completed: {
+              type: 'number',
+              description:
+                'Optional: Unix timestamp (in milliseconds) for when the todo was completed. Only applicable when is_todo=1. Set to 0 for incomplete',
             },
           },
-          {
-            name: 'get_resource_metadata',
-            description:
-              'Get metadata for a specific resource/attachment including size, MIME type, OCR text, and timestamps.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                resource_id: {
-                  type: 'string',
-                  description: 'The ID of the resource',
-                },
-              },
-              required: ['resource_id'],
+          required: ['title', 'body'],
+        },
+      },
+      {
+        name: 'update_note',
+        description:
+          'Update an existing note. Can update title, body, notebook, or convert to/from todo. Use add_tags_to_note or remove_tags_from_note to modify tags.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note to update',
+            },
+            title: {
+              type: 'string',
+              description: 'Optional: New title for the note',
+            },
+            body: {
+              type: 'string',
+              description:
+                'Optional: New body content (replaces existing content)',
+            },
+            notebook_id: {
+              type: 'string',
+              description: 'Optional: Move note to a different notebook',
+            },
+            is_todo: {
+              type: 'number',
+              description:
+                'Optional: Set to 1 to convert to todo, 0 to convert to regular note',
+            },
+            todo_due: {
+              type: 'number',
+              description:
+                'Optional: Unix timestamp (in milliseconds) for when the todo is due. Only applicable when is_todo=1',
+            },
+            todo_completed: {
+              type: 'number',
+              description:
+                'Optional: Unix timestamp (in milliseconds) for when the todo was completed. Set to 0 to mark incomplete, or a timestamp to mark complete. Only applicable when is_todo=1',
             },
           },
-          {
-            name: 'get_note_attachments',
-            description:
-              'List all file attachments in a specific note. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                note_id: {
-                  type: 'string',
-                  description: 'The ID of the note',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,mime,filename,size,file_extension,created_time,updated_time',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time, size (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-              required: ['note_id'],
+          required: ['note_id'],
+        },
+      },
+      {
+        name: 'append_to_note',
+        description: 'Append content to the end of an existing note.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
+            },
+            content: {
+              type: 'string',
+              description: 'Content to append',
             },
           },
-          {
-            name: 'get_resource_notes',
-            description:
-              'Find all notes that reference/use a specific resource/attachment. Essential before deleting a resource. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                resource_id: {
-                  type: 'string',
-                  description: 'The ID of the resource',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: title, updated_time, created_time (default: updated_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
-              required: ['resource_id'],
+          required: ['note_id', 'content'],
+        },
+      },
+      {
+        name: 'prepend_to_note',
+        description: 'Prepend content to the beginning of an existing note.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
+            },
+            content: {
+              type: 'string',
+              description: 'Content to prepend',
             },
           },
-          {
-            name: 'download_attachment',
-            description:
-              'Download a file attachment from Joplin by resource ID. Saves to specified path.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                resource_id: {
-                  type: 'string',
-                  description: 'The ID of the resource to download',
-                },
-                output_path: {
-                  type: 'string',
-                  description: 'Local file path to save the downloaded file',
-                },
-              },
-              required: ['resource_id', 'output_path'],
+          required: ['note_id', 'content'],
+        },
+      },
+      {
+        name: 'delete_note',
+        description: 'Delete a note (moves it to the trash).',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note to delete',
             },
           },
-          {
-            name: 'upload_attachment',
-            description:
-              'Upload a file attachment (image, PDF, etc.) to Joplin. Returns resource ID that can be referenced in notes.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                file_path: {
-                  type: 'string',
-                  description: 'Local file path to upload',
-                },
-                title: {
-                  type: 'string',
-                  description: 'Filename to use in Joplin',
-                },
-                mime_type: {
-                  type: 'string',
-                  description: 'MIME type (e.g., image/png, application/pdf)',
-                },
-              },
-              required: ['file_path', 'title', 'mime_type'],
-            },
-          },
-          {
-            name: 'update_resource',
-            description:
-              'Update a resource/attachment. Can update file content, metadata (title), or both.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                resource_id: {
-                  type: 'string',
-                  description: 'The ID of the resource to update',
-                },
-                file_path: {
-                  type: 'string',
-                  description: 'Optional: New file to replace existing content',
-                },
-                title: {
-                  type: 'string',
-                  description: 'Optional: New title for the resource',
-                },
-                mime_type: {
-                  type: 'string',
-                  description: 'Optional: New MIME type (only with file_path)',
-                },
-              },
-              required: ['resource_id'],
-            },
-          },
-          {
-            name: 'delete_resource',
-            description:
-              'Delete a resource/attachment from Joplin. WARNING: This will break references in notes that use this resource. Use get_resource_notes first to check usage.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                resource_id: {
-                  type: 'string',
-                  description: 'The ID of the resource to delete',
-                },
-              },
-              required: ['resource_id'],
-            },
-          },
+          required: ['note_id'],
+        },
+      },
 
-          // Revision Operations
-          {
-            name: 'list_all_revisions',
-            description:
-              'List all revisions (version history) across all notes. Returns revision IDs, item_id (note ID), timestamps, and change metadata. Filter by item_id after retrieval to find revisions for a specific note. Optionally sort results.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return. Default: id,parent_id,item_type,item_id,item_updated_time,created_time,updated_time',
-                },
-                order_by: {
-                  type: 'string',
-                  description:
-                    'Field to sort by: created_time, item_updated_time (default: created_time)',
-                },
-                order_dir: {
-                  type: 'string',
-                  enum: ['ASC', 'DESC'],
-                  description:
-                    'Sort direction: ASC (oldest first) or DESC (newest first). Default: DESC',
-                },
-                limit: {
-                  type: 'number',
-                  description:
-                    'Optional: Maximum number of items to return (default: 100)',
-                },
-              },
+      // Tag Management
+      {
+        name: 'add_tags_to_note',
+        description: `Add one or more tags to an existing note.
+
+STRATEGIC GUIDANCE: Tags are created automatically if they don't exist, so you don't need to check tag existence before adding them. This makes bulk tagging operations safe and convenient. Tags are added to any existing tags (not replaced), so it's safe to call this multiple times. Use comma-separated format for multiple tags (e.g., "work,urgent,project-alpha").
+
+Useful for organizing notes, marking priorities, or categorizing content.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
+            },
+            tags: {
+              type: 'string',
+              description: 'Comma-separated list of tag names to add',
             },
           },
-          {
-            name: 'get_revision',
-            description:
-              'Get details of a specific revision by ID. Returns the diff showing what changed (title_diff, body_diff, metadata_diff) and timestamps. Useful for viewing or restoring previous versions. Note: To find revision IDs for a note, first use list_all_revisions and filter by item_id.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                revision_id: {
-                  type: 'string',
-                  description: 'The ID of the revision',
-                },
-                fields: {
-                  type: 'string',
-                  description:
-                    'Optional: Comma-separated list of fields to return. Default: id,parent_id,item_type,item_id,item_updated_time,title_diff,body_diff,metadata_diff,encryption_applied,encryption_cipher_text,created_time,updated_time',
-                },
-              },
-              required: ['revision_id'],
+          required: ['note_id', 'tags'],
+        },
+      },
+      {
+        name: 'remove_tags_from_note',
+        description:
+          "Remove specific tags from a note. Silently ignores tags that don't exist or aren't on the note.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
+            },
+            tags: {
+              type: 'string',
+              description: 'Comma-separated list of tag names to remove',
             },
           },
-        ],
+          required: ['note_id', 'tags'],
+        },
+      },
+      {
+        name: 'list_tags',
+        description: `List all tags in Joplin.
+
+STRATEGIC GUIDANCE: Use this to discover what organizational tags the user has available before filtering notes by tag or suggesting tag-based organization. The returned tag IDs and names can be used with get_notes_by_tag, add_tags_to_note, and other tag operations.
+
+Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,created_time,updated_time',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=title, order_dir=ASC for alphabetical',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+        },
+      },
+      {
+        name: 'rename_tag',
+        description:
+          'Rename a tag. All notes with this tag will show the new name. Provide either tag_id or current_name.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tag_id: {
+              type: 'string',
+              description:
+                'The ID of the tag to rename (use this OR current_name)',
+            },
+            current_name: {
+              type: 'string',
+              description: 'Current name of the tag (use this OR tag_id)',
+            },
+            new_name: {
+              type: 'string',
+              description: 'New name for the tag',
+            },
+          },
+          required: ['new_name'],
+        },
+      },
+      {
+        name: 'delete_tag',
+        description:
+          'Delete a tag from Joplin. All notes will no longer have this tag.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tag_id: {
+              type: 'string',
+              description: 'The ID of the tag to delete',
+            },
+          },
+          required: ['tag_id'],
+        },
+      },
+      {
+        name: 'get_tag_by_id',
+        description:
+          'Get a specific tag by ID. Returns tag title and timestamps.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tag_id: {
+              type: 'string',
+              description: 'The ID of the tag',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,created_time,updated_time',
+            },
+          },
+          required: ['tag_id'],
+        },
+      },
+      {
+        name: 'get_notes_by_tag',
+        description:
+          'Get all notes that have a specific tag. Provide either tag_id or tag_name. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tag_id: {
+              type: 'string',
+              description: 'The ID of the tag (use this OR tag_name)',
+            },
+            tag_name: {
+              type: 'string',
+              description: 'The name of the tag (use this OR tag_id)',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, user_updated_time, user_created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+        },
+      },
+
+      // Resource Operations
+      {
+        name: 'list_all_resources',
+        description:
+          'List all file attachments (images, PDFs, etc.) across all notes. Returns metadata including OCR text if available. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,mime,filename,size,created_time,updated_time,file_extension,ocr_text,ocr_status',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, size (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC. Example: order_by=size, order_dir=DESC for largest first',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+        },
+      },
+      {
+        name: 'get_resource_metadata',
+        description:
+          'Get metadata for a specific resource/attachment including size, MIME type, OCR text, and timestamps.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            resource_id: {
+              type: 'string',
+              description: 'The ID of the resource',
+            },
+          },
+          required: ['resource_id'],
+        },
+      },
+      {
+        name: 'get_note_attachments',
+        description:
+          'List all file attachments in a specific note. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: {
+              type: 'string',
+              description: 'The ID of the note',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,mime,filename,size,file_extension,created_time,updated_time',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time, size (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+          required: ['note_id'],
+        },
+      },
+      {
+        name: 'get_resource_notes',
+        description:
+          'Find all notes that reference/use a specific resource/attachment. Essential before deleting a resource. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            resource_id: {
+              type: 'string',
+              description: 'The ID of the resource',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return (e.g., "id,title,updated_time"). Default: id,title,parent_id,created_time,updated_time',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: title, updated_time, created_time (default: updated_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (ascending) or DESC (descending). Default: DESC',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+          required: ['resource_id'],
+        },
+      },
+      {
+        name: 'download_attachment',
+        description:
+          'Download a file attachment from Joplin by resource ID. Saves to specified path.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            resource_id: {
+              type: 'string',
+              description: 'The ID of the resource to download',
+            },
+            output_path: {
+              type: 'string',
+              description: 'Local file path to save the downloaded file',
+            },
+          },
+          required: ['resource_id', 'output_path'],
+        },
+      },
+      {
+        name: 'upload_attachment',
+        description:
+          'Upload a file attachment (image, PDF, etc.) to Joplin. Returns resource ID that can be referenced in notes.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            file_path: {
+              type: 'string',
+              description: 'Local file path to upload',
+            },
+            title: {
+              type: 'string',
+              description: 'Filename to use in Joplin',
+            },
+            mime_type: {
+              type: 'string',
+              description: 'MIME type (e.g., image/png, application/pdf)',
+            },
+          },
+          required: ['file_path', 'title', 'mime_type'],
+        },
+      },
+      {
+        name: 'update_resource',
+        description:
+          'Update a resource/attachment. Can update file content, metadata (title), or both.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            resource_id: {
+              type: 'string',
+              description: 'The ID of the resource to update',
+            },
+            file_path: {
+              type: 'string',
+              description: 'Optional: New file to replace existing content',
+            },
+            title: {
+              type: 'string',
+              description: 'Optional: New title for the resource',
+            },
+            mime_type: {
+              type: 'string',
+              description: 'Optional: New MIME type (only with file_path)',
+            },
+          },
+          required: ['resource_id'],
+        },
+      },
+      {
+        name: 'delete_resource',
+        description:
+          'Delete a resource/attachment from Joplin. WARNING: This will break references in notes that use this resource. Use get_resource_notes first to check usage.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            resource_id: {
+              type: 'string',
+              description: 'The ID of the resource to delete',
+            },
+          },
+          required: ['resource_id'],
+        },
+      },
+
+      // Revision Operations
+      {
+        name: 'list_all_revisions',
+        description:
+          'List all revisions (version history) across all notes. Returns revision IDs, item_id (note ID), timestamps, and change metadata. Filter by item_id after retrieval to find revisions for a specific note. Optionally sort results.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return. Default: id,parent_id,item_type,item_id,item_updated_time,created_time,updated_time',
+            },
+            order_by: {
+              type: 'string',
+              description:
+                'Field to sort by: created_time, item_updated_time (default: created_time)',
+            },
+            order_dir: {
+              type: 'string',
+              enum: ['ASC', 'DESC'],
+              description:
+                'Sort direction: ASC (oldest first) or DESC (newest first). Default: DESC',
+            },
+            limit: {
+              type: 'number',
+              description:
+                'Optional: Maximum number of items to return (default: 100)',
+            },
+          },
+        },
+      },
+      {
+        name: 'get_revision',
+        description:
+          'Get details of a specific revision by ID. Returns the diff showing what changed (title_diff, body_diff, metadata_diff) and timestamps. Useful for viewing or restoring previous versions. Note: To find revision IDs for a note, first use list_all_revisions and filter by item_id.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            revision_id: {
+              type: 'string',
+              description: 'The ID of the revision',
+            },
+            fields: {
+              type: 'string',
+              description:
+                'Optional: Comma-separated list of fields to return. Default: id,parent_id,item_type,item_id,item_updated_time,title_diff,body_diff,metadata_diff,encryption_applied,encryption_cipher_text,created_time,updated_time',
+            },
+          },
+          required: ['revision_id'],
+        },
+      },
+    ];
+  }
+
+  private setupToolHandlers() {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: this.getToolsDefinitions(),
       };
     });
 
@@ -2294,6 +2317,79 @@ Examples:
     });
   }
 
+  /**
+   * Generate Gemini CLI-compatible TOML configuration
+   */
+  generateToml(): string {
+    // Get the tools list by manually extracting from the schema
+    // This is the same list we return from ListToolsRequestSchema
+    const tools = this.getToolsList();
+
+    let toml = 'description = "Interact with the Joplin note-taking app."\n';
+    toml += 'prompt = """\n';
+    toml += 'You are a command parser for the Joplin extension.\n';
+    toml += '\n';
+    toml += 'User input: {{args}}\n';
+    toml += '\n';
+    toml += "Parse the user's input and call the appropriate Joplin tool.\n";
+    toml += '"""\n';
+    toml += '\n';
+    toml += '[tools]\n';
+
+    for (const tool of tools) {
+      // Get first line of description for TOML (strip strategic guidance for brevity)
+      const firstLine =
+        tool.description
+          .split('\n')
+          .filter(
+            (line) => line.trim() && !line.includes('STRATEGIC GUIDANCE'),
+          )[0]
+          ?.trim() ||
+        tool.description.split('\n')[0]?.trim() ||
+        'No description';
+
+      toml += `${tool.name} = {\n`;
+      toml += `  description = "${this.escapeTomlString(firstLine)}",\n`;
+      toml += `  args = {\n`;
+
+      const properties = tool.inputSchema?.properties || {};
+      const propertyEntries = Object.entries(properties);
+
+      for (let i = 0; i < propertyEntries.length; i++) {
+        const [key, schema] = propertyEntries[i];
+        const description =
+          (schema as { description?: string }).description || '';
+        const isLast = i === propertyEntries.length - 1;
+        toml += `    ${key} = "${this.escapeTomlString(description)}"${isLast ? '' : ','}\n`;
+      }
+
+      toml += `  }\n`;
+      toml += `}\n`;
+      toml += '\n';
+    }
+
+    return toml;
+  }
+
+  /**
+   * Escape special characters for TOML strings
+   */
+  private escapeTomlString(str: string): string {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, ' ')
+      .replace(/\r/g, '')
+      .replace(/\t/g, ' ');
+  }
+
+  /**
+   * Get the tools list (same as what ListToolsRequestSchema returns)
+   */
+  private getToolsList() {
+    return this.getToolsDefinitions();
+  }
+
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -2316,7 +2412,44 @@ Examples:
   }
 }
 
-const server = new JoplinServer();
-server.run().catch(() => {
-  process.exit(1);
-});
+// Only run CLI logic if this is the main module (not imported for tests)
+// Check if we're being run directly by comparing the URL to the actual resolved path
+// Use realpathSync to resolve symlinks for both paths
+const scriptPath = process.argv[1]
+  ? realpathSync(resolve(process.argv[1]))
+  : '';
+const modulePath = realpathSync(fileURLToPath(import.meta.url));
+const isMainModule = scriptPath && modulePath === scriptPath;
+
+if (isMainModule) {
+  // Parse command line arguments
+  program
+    .option(
+      '--generate-toml',
+      'Generate Gemini CLI TOML configuration and exit',
+    )
+    .parse(process.argv);
+
+  const options = program.opts();
+
+  if (options.generateToml) {
+    // Generate TOML and exit
+    // Suppress stderr output during TOML generation
+    const originalStderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+
+    const server = new JoplinServer();
+
+    // Restore stderr
+    process.stderr.write = originalStderrWrite;
+
+    console.log(server.generateToml());
+    process.exit(0);
+  } else {
+    // Start MCP server normally
+    const server = new JoplinServer();
+    server.run().catch(() => {
+      process.exit(1);
+    });
+  }
+}
