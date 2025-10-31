@@ -830,6 +830,36 @@ export class JoplinServer {
       {
         name: 'joplin-server',
         version: getVersion(),
+        description: `MCP server for Joplin note-taking application.
+
+GENERAL WORKFLOW PATTERNS:
+Most operations follow a 2-step pattern:
+1. Discovery: Find IDs using list_* or search_* tools
+2. Action: Use the ID with get_*/update_*/delete_* tools
+
+SEARCH STRATEGY (CRITICAL):
+For natural language queries ("do you have notes about X?"), DO NOT search the user's exact phrase.
+Instead, use OR logic with synonyms: "any:1 keyword synonym1 synonym2 related-term"
+Example: "do you have docker notes?" → search "any:1 docker container containerization kubernetes orchestration"
+
+TOOL CATEGORIES:
+- Discovery: list_notebooks, list_all_notes, list_tags, list_all_resources, list_all_revisions
+- Search: search_notes (primary tool for "do you have notes about X?" queries)
+- Retrieval: get_note, get_notebook_by_id, get_tag_by_id, get_resource_metadata, get_revision
+- Filtered retrieval: get_notebook_notes, get_notes_by_tag, get_note_attachments, get_resource_notes
+- Creation: create_note, create_notebook, upload_attachment
+- Modification: update_note, update_notebook, update_resource, append_to_note, prepend_to_note, add_tags_to_note, remove_tags_from_note, rename_tag, move_note_to_notebook
+- Deletion: delete_note, delete_notebook, delete_tag, delete_resource (always check dependencies first)
+
+PARAMETER PREFERENCES:
+- Prefer name parameters over ID parameters when available (tag_name vs tag_id, current_name vs tag_id)
+- IDs are needed for precision; names are more intuitive for users
+
+DESTRUCTIVE OPERATIONS:
+- delete_notebook: Must be empty first (check with get_notebook_notes)
+- delete_tag: Removes tag from ALL notes (check impact with get_notes_by_tag)
+- delete_resource: Breaks note references (check with get_resource_notes)
+- update_note body: Overwrites all content (use append_to_note/prepend_to_note to preserve)`,
       },
       {
         capabilities: {
@@ -905,8 +935,26 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'get_notebook_notes',
-        description:
-          'Get all notes from a specific notebook. Returns note titles, IDs, and metadata. Optionally sort results.',
+        description: `Get all notes within a specific notebook (folder).
+
+WHEN TO USE:
+- User asks to see notes in a specific notebook/folder
+- Browsing contents of a known notebook
+- Filtering notes by organizational location
+- User says "show me notes in my Work folder"
+
+WHEN NOT TO USE:
+- Searching across all notebooks for a topic → Use search_notes with notebook: filter if needed
+- User asks "do you have notes about X?" → Use search_notes
+- Getting a single specific note → Use get_note (requires note_id)
+
+WORKFLOW:
+1. Get notebook_id from list_notebooks or user already provided it
+2. Call this tool with the notebook_id
+3. Results include note IDs, titles, content, and metadata
+4. Use get_note for full details of specific notes if needed
+
+RETURNS: Array of notes with IDs, titles, body content, parent_id, timestamps, and todo status. Supports custom sorting and field selection.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -941,8 +989,27 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'update_notebook',
-        description:
-          'Update notebook properties (rename or move to different parent).',
+        description: `Update a notebook's properties (rename or change nesting).
+
+WHAT YOU CAN UPDATE:
+- title: Rename the notebook
+- parent_id: Move notebook under a different parent (nesting) or set to empty string to un-nest
+
+WHEN TO USE:
+- User wants to rename a notebook
+- Reorganizing notebook hierarchy by changing parent relationships
+- Un-nesting a notebook (set parent_id to empty string)
+
+WORKFLOW FOR RENAMING:
+1. Get notebook_id from list_notebooks if needed
+2. Call update_notebook with notebook_id + new title
+
+WORKFLOW FOR NESTING:
+1. Get target parent notebook_id from list_notebooks
+2. Call update_notebook with notebook_id + parent_id of the parent notebook
+3. The notebook will appear nested under the parent
+
+RETURNS: Updated notebook object with new title and/or parent_id.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -964,7 +1031,18 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'delete_notebook',
-        description: 'Delete a notebook. The notebook must be empty.',
+        description: `Delete a notebook from Joplin.
+
+IMPORTANT REQUIREMENT: The notebook must be empty before deletion. Joplin will reject deletion attempts on notebooks that contain notes.
+
+RECOMMENDED WORKFLOW:
+1. Call get_notebook_notes to check if the notebook has any notes
+2. If notes exist, either move them (move_note_to_notebook) or delete them (delete_note)
+3. Only then call delete_notebook
+
+WHEN NOT TO USE: If the notebook contains notes and you haven't emptied it first, this operation will fail with an error.
+
+Use this for cleaning up empty organizational structures or removing notebooks that have been fully migrated elsewhere.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -978,8 +1056,20 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'get_notebook_by_id',
-        description:
-          'Get a specific notebook by ID. Returns notebook title, parent_id, and timestamps.',
+        description: `Get details for a specific notebook by its ID.
+
+WHEN TO USE:
+- You have a notebook_id from list_notebooks or a note's parent_id field
+- Need to verify notebook name or check its organizational structure
+- Checking if a notebook is nested (has parent_id)
+- Getting metadata about a specific notebook
+
+WHEN NOT TO USE:
+- If you don't know the notebook_id yet → Use list_notebooks to find it by name
+- Listing all notebooks → Use list_notebooks
+- Getting notes within the notebook → Use get_notebook_notes
+
+RETURNS: Notebook metadata including id, title, parent_id (for nested notebooks), and timestamps. The parent_id field indicates if this notebook is nested under another.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -998,7 +1088,21 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'move_note_to_notebook',
-        description: 'Move a note to a different notebook.',
+        description: `Move a note from its current notebook to a different notebook.
+
+WHEN TO USE:
+- User wants to reorganize notes between notebooks
+- Moving note to better organizational location
+- Consolidating notes from multiple notebooks
+
+WORKFLOW:
+1. Get the note_id (from search_notes, list_all_notes, or get_notebook_notes)
+2. Get the destination notebook_id (from list_notebooks)
+3. Call this tool with both IDs
+
+ALTERNATIVE: You can also use update_note with notebook_id parameter - both methods work identically.
+
+RETURNS: Confirmation that the note has been moved. The note's parent_id field will now point to the new notebook.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1018,8 +1122,23 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       // Note Operations
       {
         name: 'list_all_notes',
-        description:
-          'List all notes across all notebooks. Returns note titles, IDs, content, and metadata. Optionally include deleted notes, customize fields, and sort results.',
+        description: `List all notes across all notebooks in Joplin.
+
+WHEN TO USE:
+- User asks for "all notes" or wants a global view
+- Need to browse notes chronologically (use order_by for sorting)
+- Looking for recently updated/created notes across all notebooks
+- Generating statistics or reports across entire note collection
+
+WHEN NOT TO USE (use specialized tools instead):
+- Searching for specific topics/keywords → Use search_notes
+- Filtering by specific notebook → Use get_notebook_notes
+- Filtering by specific tag → Use get_notes_by_tag
+- User asks "do you have notes about X?" → Use search_notes with OR logic
+
+RETURNS: Note IDs, titles, body content, parent notebook ID (parent_id), timestamps, and todo status if applicable. Supports sorting and field customization.
+
+NOTE: This returns ALL notes, which can be a large dataset. Consider using more targeted tools when the user has specific criteria.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1053,41 +1172,75 @@ Returns notebook ID, title, parent_id (for nested notebooks), and timestamps. Su
       },
       {
         name: 'search_notes',
-        description: `Search for notes using Joplin's powerful query syntax.
+        description: `Search for notes using Joplin's query syntax.
 
-STRATEGIC GUIDANCE: Default to broader searches first - a search that returns too many notes is better than one that returns zero. If a simple keyword search like "project" returns no results, do NOT immediately give up. Instead, try variations: search for "proj*" (wildcard), check if notes might use "initiative" or "plan" instead, or search within specific notebooks using the notebook: filter. Always expand your search strategy when initial queries return empty results.
+CRITICAL SEARCH STRATEGY - READ THIS FIRST:
+When users ask questions like "do you have notes about X?", DO NOT search for their exact phrase. Instead, construct intelligent queries using these strategies:
 
-Basic syntax:
-- Single/multiple words: "linux kernel" (AND logic by default)
-- Phrases: "shopping list" (exact match)
-- Wildcards: "swim*" (prefix matching)
+1. BROAD QUERIES (Default Approach):
+   - Use any:1 with multiple synonyms and related terms
+   - Example: User asks "linux installation steps" → Search: "any:1 linux install installation setup guide tutorial steps configure"
+   - Example: User asks "project documentation" → Search: "any:1 project initiative plan documentation docs readme guide"
+   - Rationale: A search returning 10 results you can filter is better than returning 0 results
+
+2. PRECISE QUERIES (When Specific):
+   - Use field filters when user specifies criteria
+   - Example: "recent work notes" → Search: "tag:work updated:month-1"
+   - Example: "notes with images" → Search: "resource:image/*"
+
+3. NEVER DO THIS:
+   - ❌ Don't search exact user phrases: "do you have notes about docker" (will fail)
+   - ❌ Don't give up after one failed search
+   - ✅ Always try variations, wildcards, and broader OR queries
+
+WHEN TO USE search_notes:
+- User asks "do you have notes about X?"
+- User provides keywords or topics to search
+- Looking for content based on concepts (not just titles)
+
+WHEN NOT TO USE search_notes:
+- For "all notes" or chronological lists → Use list_all_notes
+- User specifies a notebook/folder → Use get_notebook_notes
+- User specifies a single exact tag → Use get_notes_by_tag
+
+WORKFLOW:
+1. Construct a smart query (use OR logic + synonyms for concepts)
+2. Examine results (returns note IDs and titles)
+3. Use get_note to fetch full content of relevant results
+4. If zero results, try wildcards or broader terms
+
+QUERY SYNTAX REFERENCE:
+
+Basic:
+- Words: "linux kernel" (AND logic - both required)
+- Phrases: "shopping list" (exact phrase)
+- Wildcards: "swim*" (prefix match)
 - Exclusion: "-spam" (exclude term)
+- OR logic: "any:1 arch ubuntu fedora" (match any term)
 
-Field-specific filters:
-- title:TERM - Search in title only
-- body:TERM - Search in body only
-- tag:TAG - Filter by tag (supports wildcards: tag:proj*)
+Field filters:
+- title:TERM - Search titles only
+- body:TERM - Search body text only
+- tag:TAG - Filter by tag (wildcards ok: tag:proj*)
 - notebook:NAME - Filter by notebook name
-- resource:MIME - Filter by attachment type (resource:image/*, resource:application/pdf)
+- resource:MIME - Has attachment type (resource:image/*, resource:application/pdf)
 
-Date filters (formats: YYYYMMDD, YYYYMM, YYYY, or relative like day-7, month-1, year-0):
-- created:DATE - Filter by creation date
-- updated:DATE - Filter by update date
-- due:DATE - Filter by todo due date
+Date filters (formats: YYYYMMDD, YYYYMM, YYYY, day-7, month-1, year-0):
+- created:DATE - Creation date
+- updated:DATE - Last modified date
+- due:DATE - Todo due date
 
 Type filters:
-- type:note|todo - Filter by item type
-- iscompleted:0|1 - Filter completed/incomplete todos
+- type:note|todo - Item type
+- iscompleted:0|1 - Todo completion status
 
-Boolean logic:
-- any:1 - Use OR instead of AND (example: "any:1 arch ubuntu" finds either)
-
-Examples:
-- Find Linux tutorials: "title:linux tag:tutorial"
-- Recent work notes: "tag:work updated:month-1"
-- Notes with images: "resource:image/*"
+Query examples:
+- Broad concept search: "any:1 kubernetes k8s docker container orchestration"
+- Title search: "title:linux tag:tutorial"
+- Recent work: "tag:work updated:month-1"
+- With images: "resource:image/*"
 - Exclude archived: "project -tag:archived"
-- Either/or search: "any:1 kubernetes docker"`,
+- Wildcard: "swim*" (finds swimming, swimmer, etc.)`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1105,8 +1258,27 @@ Examples:
       },
       {
         name: 'get_note',
-        description:
-          'Get the full content of a specific note by ID. Returns title, body (content), notebook, timestamps, and tags.',
+        description: `Get the complete content and metadata of a specific note.
+
+WHEN TO USE:
+- You have a note_id from search results, list operations, or user input
+- Need to read the full body content of a note
+- Checking what tags are on a note
+- Getting detailed note information including timestamps
+
+TYPICAL WORKFLOW:
+1. Find notes using search_notes, list_all_notes, get_notebook_notes, or get_notes_by_tag
+2. Those tools return note IDs and titles (sometimes with body excerpts)
+3. Call get_note with the note_id to get full content
+4. Examine the complete body field and tags array
+
+RETURNS: Complete note object including:
+- id, title - Note identification
+- body - Full markdown content
+- parent_id - Notebook ID (use get_notebook_by_id to get notebook name)
+- tags - Array of tag objects with id and title
+- created_time, updated_time - Timestamps
+- is_todo, todo_completed, todo_due - Todo-related fields if applicable`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1120,11 +1292,30 @@ Examples:
       },
       {
         name: 'create_note',
-        description: `Create a new note with title and body content.
+        description: `Create a new note in Joplin with title and body content.
 
-STRATEGIC GUIDANCE: Before creating a note, use list_notebooks to discover the notebook_id if the user wants to place the note in a specific notebook. Tags specified in the tags parameter will be created automatically if they don't exist, so you don't need to check tag existence first. Markdown formatting is fully supported in the body field and should be used for better note structure.
+WORKFLOW FOR SPECIFIC NOTEBOOK PLACEMENT:
+1. If user specifies a notebook/folder name, call list_notebooks first
+2. Find the notebook_id from the results
+3. Call create_note with the notebook_id parameter
+4. If no notebook specified, omit notebook_id (uses default notebook)
 
-Supports creating regular notes or todo items with due dates. Can specify notebook placement and tags at creation time.`,
+TAG CONVENIENCE: Tags specified in the tags parameter are created automatically if they don't exist. No need to call list_tags or verify tag existence first. Just provide comma-separated tag names (e.g., "work,urgent,project-alpha").
+
+CONTENT FORMATTING: The body field supports full Markdown syntax. Use it for:
+- Headers (# ## ###)
+- Lists (- or 1. 2. 3.)
+- Links, bold, italic, code blocks
+- Embedded attachments: ![image](:/resource_id) or [file](:/resource_id)
+
+CREATING TODOS: Set is_todo=1 to create a todo item instead of a regular note. Optionally add todo_due timestamp for due dates.
+
+WHEN TO USE:
+- User asks to create/make/add a new note
+- Capturing information provided by user
+- Converting user input into stored notes
+
+RETURNS: Created note object with id and title. Save the id if you need to reference the note in follow-up operations.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1166,8 +1357,28 @@ Supports creating regular notes or todo items with due dates. Can specify notebo
       },
       {
         name: 'update_note',
-        description:
-          'Update an existing note. Can update title, body, notebook, or convert to/from todo. Use add_tags_to_note or remove_tags_from_note to modify tags.',
+        description: `Update an existing note's properties.
+
+WHAT YOU CAN UPDATE:
+- title: Change the note's title
+- body: Replace entire content (WARNING: this overwrites existing content)
+- notebook_id: Move note to different notebook (same as move_note_to_notebook)
+- is_todo: Convert between regular note (0) and todo item (1)
+- todo_due: Set/update due date for todos (Unix timestamp in milliseconds)
+- todo_completed: Mark todo complete/incomplete (timestamp or 0)
+
+WHAT YOU CANNOT UPDATE HERE:
+- Tags: Use add_tags_to_note or remove_tags_from_note instead
+- For appending/prepending content: Use append_to_note or prepend_to_note to avoid overwriting
+
+WORKFLOW EXAMPLES:
+1. Rename note: update_note with note_id + new title
+2. Move to notebook: update_note with note_id + notebook_id (or use move_note_to_notebook)
+3. Convert to todo: update_note with note_id + is_todo=1 + optional todo_due timestamp
+4. Mark todo complete: update_note with note_id + todo_completed=[current_timestamp]
+5. Full rewrite: update_note with note_id + new body (replaces all content)
+
+CAUTION: Updating the body replaces ALL existing content. To add content while preserving existing text, use append_to_note or prepend_to_note instead.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1209,7 +1420,26 @@ Supports creating regular notes or todo items with due dates. Can specify notebo
       },
       {
         name: 'append_to_note',
-        description: 'Append content to the end of an existing note.',
+        description: `Add content to the end of an existing note while preserving existing content.
+
+WHEN TO USE:
+- Adding new information to an existing note
+- Logging updates or entries to a journal-style note
+- Appending meeting notes, ideas, or follow-ups
+- User says "add this to my note" or "append to note"
+
+WHEN NOT TO USE:
+- Replacing entire note content → Use update_note with body parameter
+- Adding content at the beginning → Use prepend_to_note
+
+BEHAVIOR: Adds two newlines (\\n\\n) then your content to the end of the note's current body. This preserves the existing content and creates a visual separation.
+
+WORKFLOW:
+1. Get note_id (from search_notes or other list operations)
+2. Call append_to_note with the note_id and new content
+3. The tool automatically fetches current content, appends yours, and updates
+
+EXAMPLE: If note body is "# Meeting\\nAttendees: Alice, Bob" and you append "## Action Items\\n- Review proposal", the result is "# Meeting\\nAttendees: Alice, Bob\\n\\n## Action Items\\n- Review proposal"`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1227,7 +1457,26 @@ Supports creating regular notes or todo items with due dates. Can specify notebo
       },
       {
         name: 'prepend_to_note',
-        description: 'Prepend content to the beginning of an existing note.',
+        description: `Add content to the beginning of an existing note while preserving existing content.
+
+WHEN TO USE:
+- Adding high-priority information that should appear first
+- Inserting summary or overview before existing details
+- Adding timestamps or metadata at the top
+- User says "add this to the top of my note"
+
+WHEN NOT TO USE:
+- Replacing entire note content → Use update_note with body parameter
+- Adding content at the end → Use append_to_note
+
+BEHAVIOR: Adds your content, then two newlines (\\n\\n), then the existing note body. This preserves existing content and creates visual separation.
+
+WORKFLOW:
+1. Get note_id (from search_notes or other list operations)
+2. Call prepend_to_note with the note_id and new content
+3. The tool automatically fetches current content, prepends yours, and updates
+
+EXAMPLE: If note body is "## Details\\nContent here" and you prepend "# Summary\\nQuick overview", the result is "# Summary\\nQuick overview\\n\\n## Details\\nContent here"`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1245,7 +1494,29 @@ Supports creating regular notes or todo items with due dates. Can specify notebo
       },
       {
         name: 'delete_note',
-        description: 'Delete a note (moves it to the trash).',
+        description: `Delete a note by moving it to the trash.
+
+IMPORTANT BEHAVIOR: By default, this moves the note to Joplin's trash (soft delete). The note can be recovered from the trash in the Joplin UI. This tool does NOT perform permanent deletion.
+
+WHEN TO USE:
+- User explicitly requests note deletion
+- Cleaning up duplicate or obsolete notes
+- Removing test notes or temporary content
+
+BEFORE DELETION (recommended):
+- Confirm with user if unsure
+- For important notes, consider using get_note to review content first
+- Check if note contains critical information
+
+WORKFLOW:
+1. Get note_id (from search_notes or list operations)
+2. Optionally call get_note to review content
+3. Call delete_note with the note_id
+4. Note moves to trash but is recoverable
+
+ALTERNATIVE OPERATIONS:
+- Moving to different notebook → Use move_note_to_notebook instead
+- Archiving with tags → Use add_tags_to_note to add "archived" tag instead`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1283,8 +1554,24 @@ Useful for organizing notes, marking priorities, or categorizing content.`,
       },
       {
         name: 'remove_tags_from_note',
-        description:
-          "Remove specific tags from a note. Silently ignores tags that don't exist or aren't on the note.",
+        description: `Remove one or more tags from a note.
+
+BEHAVIOR: Silently ignores tags that don't exist or aren't currently on the note, so this operation is safe to call without checking tag existence first.
+
+WHEN TO USE:
+- User wants to remove specific tags from a note
+- Cleaning up note organization
+- Removing outdated or incorrect tags
+- Un-categorizing notes
+
+WORKFLOW:
+1. Get note_id (from search_notes or other operations)
+2. Call this tool with note_id + comma-separated tag names
+3. Only the specified tags are removed; other tags remain
+
+FORMAT: Provide tags as comma-separated names (e.g., "work,urgent" to remove both tags).
+
+NOTE: This only removes tag associations from the specific note. The tags themselves remain in Joplin and can still be used on other notes. To delete a tag entirely, use delete_tag.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1336,8 +1623,23 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'rename_tag',
-        description:
-          'Rename a tag. All notes with this tag will show the new name. Provide either tag_id or current_name.',
+        description: `Rename a tag across all notes that use it.
+
+PARAMETER PREFERENCE: Prefer using current_name when you know the tag name from the user's request (e.g., "rename my 'work' tag to 'job'"). This is more intuitive. Only use tag_id if you already have the ID from a previous operation like list_tags.
+
+BEHAVIOR: All notes with this tag will automatically display the new name. This is a global rename operation that updates the tag everywhere it's used.
+
+WHEN TO USE:
+- User wants to fix tag naming (typos, better names, standardization)
+- Consolidating similar tags by renaming before deletion
+- Improving tag organization and clarity
+
+WORKFLOW:
+- Provide either current_name OR tag_id (not both)
+- Always provide new_name with the desired tag name
+- The change is immediate and affects all notes
+
+NOTE: This is safer than delete_tag + re-tagging because it preserves all tag associations.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1360,8 +1662,22 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'delete_tag',
-        description:
-          'Delete a tag from Joplin. All notes will no longer have this tag.',
+        description: `Delete a tag from Joplin permanently.
+
+⚠️ WARNING: This removes the tag from ALL notes that use it. This operation affects every note tagged with this tag across your entire Joplin database.
+
+RECOMMENDED WORKFLOW (before deletion):
+1. Call get_notes_by_tag to see which notes will be affected
+2. Confirm the impact with the user if many notes use this tag
+3. Consider rename_tag instead if the tag name just needs updating
+4. Only then proceed with delete_tag
+
+WHEN TO USE:
+- Cleaning up unused or obsolete tags
+- Removing duplicate or misspelled tags (after migrating notes)
+- User explicitly requests tag deletion and understands the scope
+
+ALTERNATIVE: If you just need to change the tag name, use rename_tag instead to preserve tag associations.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1375,8 +1691,21 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_tag_by_id',
-        description:
-          'Get a specific tag by ID. Returns tag title and timestamps.',
+        description: `Get details for a specific tag by its ID.
+
+WHEN TO USE:
+- You have a tag_id from list_tags or a note's tags array
+- Need to verify tag name or get metadata
+- Checking tag timestamps
+
+WHEN NOT TO USE:
+- If you don't know the tag_id yet → Use list_tags to find it by name
+- Getting notes with a tag → Use get_notes_by_tag (accepts tag_name directly)
+- Listing all tags → Use list_tags
+
+RETURNS: Tag metadata including id, title (tag name), created_time, and updated_time.
+
+NOTE: This is rarely needed since most tag operations (get_notes_by_tag, rename_tag, etc.) accept tag names directly. Primarily useful for inspecting metadata when you already have the ID.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1395,8 +1724,26 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_notes_by_tag',
-        description:
-          'Get all notes that have a specific tag. Provide either tag_id or tag_name. Optionally sort results.',
+        description: `Get all notes that have a specific tag.
+
+PARAMETER PREFERENCE: Prefer using tag_name when you know the tag name from the user's request. This is more convenient and readable. Only use tag_id if you already have it from a previous operation.
+
+WHEN TO USE:
+- User asks for notes with a specific tag (e.g., "show me my work notes")
+- Filtering notes by a single known tag name
+- User specifies exact tag in their request
+
+WHEN NOT TO USE:
+- User asks "do you have notes about X?" without specifying it's a tag → Use search_notes instead
+- Need to discover what tags exist first → Call list_tags first
+- Searching across multiple tags or concepts → Use search_notes with tag: filters
+
+WORKFLOW:
+1. If using tag_name: Simply call this tool with the tag name
+2. If tag doesn't exist, you'll get an error - tags must exist to query them
+3. Results include note IDs, titles, content, and metadata
+
+RETURNS: All notes tagged with the specified tag, sorted by update time by default. Supports custom sorting and field selection.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1436,8 +1783,31 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       // Resource Operations
       {
         name: 'list_all_resources',
-        description:
-          'List all file attachments (images, PDFs, etc.) across all notes. Returns metadata including OCR text if available. Optionally sort results.',
+        description: `List all file attachments (resources) across your entire Joplin database.
+
+WHEN TO USE:
+- Getting an overview of all attachments in Joplin
+- Finding large files by sorting by size
+- Searching for attachments by file type or name
+- Auditing storage usage or finding unused attachments
+
+RETURNS: Array of resources with metadata:
+- id, title, filename - Identification
+- mime, file_extension - File type information
+- size - File size in bytes
+- ocr_text, ocr_status - OCR-extracted text from images (if available)
+- created_time, updated_time - Timestamps
+
+FILTERING TECHNIQUES:
+- After retrieval, filter by mime type to find specific file types
+- Sort by size (order_by=size, order_dir=DESC) to find large files
+- Check ocr_text field to search text within images
+
+WHEN NOT TO USE:
+- Getting attachments for specific note → Use get_note_attachments
+- Checking which notes use a specific attachment → Use get_resource_notes
+
+NOTE: This returns ALL resources globally, which can be a large dataset for users with many attachments.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1467,8 +1837,28 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_resource_metadata',
-        description:
-          'Get metadata for a specific resource/attachment including size, MIME type, OCR text, and timestamps.',
+        description: `Get detailed metadata for a specific attachment/resource.
+
+WHEN TO USE:
+- You have a resource_id and need detailed information
+- Checking file size, MIME type, or file extension
+- Accessing OCR-extracted text from images
+- Checking if resource is shared or getting share information
+
+RETURNS: Comprehensive resource metadata including:
+- id, title, filename - Identification
+- mime, file_extension - File type
+- size - File size in bytes
+- ocr_text, ocr_status - Extracted text from images (if Joplin's OCR processed it)
+- is_shared, share_id - Sharing information
+- created_time, updated_time, blob_updated_time - Timestamps
+
+WHEN NOT TO USE:
+- Downloading the actual file → Use download_attachment
+- Getting all resources → Use list_all_resources
+- Getting attachments for a note → Use get_note_attachments
+
+OCR FEATURE: Joplin can extract text from images via OCR. Check ocr_status to see if processing completed, and ocr_text for extracted content.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1482,8 +1872,31 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_note_attachments',
-        description:
-          'List all file attachments in a specific note. Optionally sort results.',
+        description: `List all file attachments embedded in a specific note.
+
+WHEN TO USE:
+- Checking what files are attached to a note
+- Finding images, PDFs, or other files within a note
+- Getting resource IDs for files in a note
+- Auditing note attachments
+
+WORKFLOW:
+1. Get note_id (from search_notes or other operations)
+2. Call this tool with the note_id
+3. Receive array of resources used in that note
+
+RETURNS: Array of resource metadata including:
+- id - Resource ID (used in markdown as :/resource_id)
+- title, filename - File identification
+- mime, file_extension - File type
+- size - File size in bytes
+- created_time, updated_time - Timestamps
+
+USE CASE EXAMPLE: After getting attachments, use download_attachment with resource_id to save files locally, or use update_resource to modify attachment metadata.
+
+WHEN NOT TO USE:
+- Listing all resources globally → Use list_all_resources
+- Finding which notes use a specific resource → Use get_resource_notes`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1518,8 +1931,30 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_resource_notes',
-        description:
-          'Find all notes that reference/use a specific resource/attachment. Essential before deleting a resource. Optionally sort results.',
+        description: `Find all notes that reference or embed a specific attachment.
+
+⚠️ CRITICAL USE CASE: Always call this BEFORE deleting a resource to check which notes will be affected.
+
+WHEN TO USE:
+- Before deleting a resource (to see impact)
+- Finding where an attachment is used
+- Understanding resource dependencies
+- Cleaning up or reorganizing attachments
+
+WORKFLOW FOR SAFE DELETION:
+1. Call get_resource_notes with resource_id
+2. Review which notes use this resource
+3. Update those notes if needed (remove markdown references)
+4. Only then call delete_resource
+
+RETURNS: Array of notes that reference this resource, including:
+- id, title - Note identification
+- parent_id - Notebook ID
+- created_time, updated_time - Timestamps
+
+BEHAVIOR: Resources are embedded in notes using markdown syntax like ![image](:/resource_id) or [file](:/resource_id). This tool finds all notes containing such references.
+
+NOTE: Even if a resource is uploaded, it might not be referenced in any note yet (orphaned resource).`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1554,8 +1989,26 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'download_attachment',
-        description:
-          'Download a file attachment from Joplin by resource ID. Saves to specified path.',
+        description: `Download a file attachment from Joplin to local filesystem.
+
+WHEN TO USE:
+- User wants to save an attachment locally
+- Extracting files from notes for external processing
+- Backing up attachments
+- Sharing files from Joplin with external tools
+
+WORKFLOW:
+1. Get resource_id from get_note_attachments, list_all_resources, or note content
+2. Specify output_path (local file path where file should be saved)
+3. Call this tool to download and save the file
+
+PARAMETERS:
+- resource_id: The attachment's ID from Joplin
+- output_path: Full local path including filename (e.g., "/home/user/downloads/image.png")
+
+RETURNS: Confirmation message with the save location.
+
+TIP: Use get_resource_metadata first to check the file extension and size if you need to construct an appropriate output path.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1573,8 +2026,32 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'upload_attachment',
-        description:
-          'Upload a file attachment (image, PDF, etc.) to Joplin. Returns resource ID that can be referenced in notes.',
+        description: `Upload a file attachment (image, PDF, document, etc.) to Joplin.
+
+RETURNS: A resource object with an 'id' field. This ID is critical for the next step.
+
+TYPICAL WORKFLOW (2 steps):
+1. Upload the file using this tool → Get back resource_id
+2. Embed in a note using markdown:
+   - For images: ![alt text](:/RESOURCE_ID)
+   - For files: [Link text](:/RESOURCE_ID)
+   Example: After upload returns {id: "abc123"}, add to note body: "![Screenshot](:/abc123)"
+
+WHEN TO USE:
+- User wants to attach files to notes
+- Adding images, PDFs, documents to enhance notes
+- Creating visual documentation with embedded screenshots
+
+EMBEDDING SYNTAX:
+- Images: ![description](:/resource_id) - displays inline
+- PDFs/files: [filename](:/resource_id) - creates download link
+- You MUST use the :/ prefix before the resource ID
+
+MIME TYPE EXAMPLES:
+- image/png, image/jpeg - Images
+- application/pdf - PDF documents
+- application/zip - Archives
+- text/plain - Text files`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1596,8 +2073,34 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'update_resource',
-        description:
-          'Update a resource/attachment. Can update file content, metadata (title), or both.',
+        description: `Update an existing attachment's file content and/or metadata.
+
+WHAT YOU CAN UPDATE:
+- file_path: Replace the attachment with a new file
+- title: Change the display name (doesn't affect markdown references)
+- mime_type: Update MIME type (only when updating file_path)
+
+WHEN TO USE:
+- Replacing an outdated attachment with newer version
+- Fixing incorrect file uploads
+- Renaming resources for better organization
+- Updating corrupted or wrong files
+
+WORKFLOW OPTIONS:
+
+Option 1 - Update file content:
+1. Get resource_id from get_note_attachments or list_all_resources
+2. Call update_resource with resource_id + file_path (+ optional title/mime_type)
+3. The file content is replaced while keeping the same resource_id
+
+Option 2 - Update metadata only:
+1. Get resource_id
+2. Call update_resource with resource_id + title
+3. Only the title changes, file content unchanged
+
+IMPORTANT: Updating the file content does NOT break markdown references in notes since the resource_id stays the same. This is useful for updating images or documents without editing notes.
+
+RETURNS: Updated resource object with id and title.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1623,8 +2126,28 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'delete_resource',
-        description:
-          'Delete a resource/attachment from Joplin. WARNING: This will break references in notes that use this resource. Use get_resource_notes first to check usage.',
+        description: `Delete an attachment/resource from Joplin permanently.
+
+⚠️ CRITICAL WARNING: This breaks all markdown references in notes that embed this resource. Images will show as broken, file links won't work.
+
+REQUIRED WORKFLOW (safety check):
+1. First call get_resource_notes to find affected notes
+2. Review the impact - see how many notes reference this resource
+3. If needed, edit notes to remove markdown references (![](:/resource_id) or [](:/resource_id))
+4. Only then call delete_resource
+
+AUTOMATIC BEHAVIOR: This tool includes a built-in safety check. If the resource is used in any notes, it will WARN you with details instead of deleting. You'll see which notes are affected.
+
+WHEN TO USE:
+- Cleaning up orphaned/unused resources
+- Removing large files to free storage
+- After confirming resource isn't needed (via get_resource_notes)
+
+WHEN NOT TO USE:
+- If resource is still referenced in notes (breaks those notes)
+- If unsure about impact (check get_resource_notes first)
+
+ALTERNATIVE: Instead of deletion, consider updating the resource with update_resource if you just need to replace the file content.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1640,8 +2163,33 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       // Revision Operations
       {
         name: 'list_all_revisions',
-        description:
-          'List all revisions (version history) across all notes. Returns revision IDs, item_id (note ID), timestamps, and change metadata. Filter by item_id after retrieval to find revisions for a specific note. Optionally sort results.',
+        description: `List all revisions (version history snapshots) across all notes in Joplin.
+
+WHEN TO USE:
+- Exploring note change history globally
+- Finding when specific notes were modified (check item_id field)
+- Auditing note revisions across the database
+- Finding revision IDs to examine specific changes
+
+IMPORTANT LIMITATION: Joplin's API returns ALL revisions globally. To find revisions for a specific note, you must filter the results by item_id (which contains the note ID) after retrieval.
+
+WORKFLOW TO FIND NOTE REVISIONS:
+1. Call list_all_revisions
+2. Filter results where item_id matches your target note_id
+3. Use get_revision to examine specific revision details
+4. Review title_diff, body_diff to see what changed
+
+RETURNS: Array of revision metadata including:
+- id - Revision ID (use with get_revision)
+- item_id - The note ID this revision belongs to
+- item_type - Usually "note"
+- item_updated_time - When the note was updated
+- parent_id - Parent revision ID (for revision chains)
+- created_time, updated_time - Revision timestamps
+
+SORTING: Sort by created_time (default DESC) to see most recent revisions first, or by item_updated_time to sort by when notes were actually changed.
+
+USE CASE: Version history viewing, recovering lost content, auditing note changes over time.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -1671,8 +2219,34 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'get_revision',
-        description:
-          'Get details of a specific revision by ID. Returns the diff showing what changed (title_diff, body_diff, metadata_diff) and timestamps. Useful for viewing or restoring previous versions. Note: To find revision IDs for a note, first use list_all_revisions and filter by item_id.',
+        description: `Get detailed information about a specific revision, including diffs showing what changed.
+
+WHEN TO USE:
+- Examining exactly what changed in a note at a specific point
+- Viewing previous versions of note content
+- Understanding note edit history
+- Recovering lost or deleted content from history
+
+WORKFLOW:
+1. Call list_all_revisions to get revision IDs
+2. Filter by item_id to find revisions for your target note
+3. Call get_revision with the specific revision_id
+4. Examine the diff fields to see changes
+
+RETURNS: Detailed revision information including:
+- id, parent_id - Revision identification and chain
+- item_id - The note ID this revision belongs to
+- item_type - Usually "note"
+- item_updated_time - When the note was modified
+- title_diff - Changes to note title (diff format)
+- body_diff - Changes to note content (diff format)
+- metadata_diff - Changes to note metadata (diff format)
+- encryption_applied, encryption_cipher_text - Encryption info if applicable
+- created_time, updated_time - Revision timestamps
+
+DIFF FORMAT: The *_diff fields contain diff-style changes showing what was added/removed between versions. This allows you to see exactly what changed without storing full note copies.
+
+USE CASE: Recovering accidentally deleted content, understanding who changed what (when combined with timestamps), viewing note evolution over time.`,
         inputSchema: {
           type: 'object',
           properties: {
