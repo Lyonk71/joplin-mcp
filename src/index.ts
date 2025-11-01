@@ -1480,7 +1480,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
         switch (name) {
           // Notebook Management
           case 'list_notebooks': {
-            const result = await this.apiClient.listNotebooks(
+            const result = await this.apiClient.notebooks.listNotebooks(
               args.fields as string | undefined,
               args.order_by as string | undefined,
               args.order_dir as 'ASC' | 'DESC' | undefined,
@@ -1497,7 +1497,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'create_notebook': {
-            const result = (await this.apiClient.createNotebook(
+            const result = (await this.apiClient.notebooks.createNotebook(
               args.title as string,
               args.parent_id as string | undefined,
             )) as { title: string; id: string };
@@ -1512,7 +1512,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_notebook_notes': {
-            const result = await this.apiClient.getNotebookNotes(
+            const result = await this.apiClient.notebooks.getNotebookNotes(
               args.notebook_id as string,
               args.fields as string | undefined,
               args.order_by as string | undefined,
@@ -1534,7 +1534,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
             if (args.title) updates.title = args.title as string;
             if (args.parent_id) updates.parent_id = args.parent_id as string;
 
-            const result = (await this.apiClient.updateNotebook(
+            const result = (await this.apiClient.notebooks.updateNotebook(
               args.notebook_id as string,
               updates,
             )) as { title: string; id: string };
@@ -1550,7 +1550,9 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'delete_notebook': {
-            await this.apiClient.deleteNotebook(args.notebook_id as string);
+            await this.apiClient.notebooks.deleteNotebook(
+              args.notebook_id as string,
+            );
             return {
               content: [
                 {
@@ -1562,7 +1564,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_notebook_by_id': {
-            const result = await this.apiClient.getNotebook(
+            const result = await this.apiClient.notebooks.getNotebook(
               args.notebook_id as string,
               args.fields as string | undefined,
             );
@@ -1577,7 +1579,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'move_note_to_notebook': {
-            await this.apiClient.moveNoteToNotebook(
+            await this.apiClient.notes.moveNoteToNotebook(
               args.note_id as string,
               args.notebook_id as string,
             );
@@ -1593,7 +1595,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           // Note Operations
           case 'list_all_notes': {
-            const result = await this.apiClient.listAllNotes(
+            const result = await this.apiClient.notes.listAllNotes(
               args.fields as string | undefined,
               args.include_deleted as boolean | undefined,
               args.order_by as string | undefined,
@@ -1611,7 +1613,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'search_notes': {
-            const result = await this.apiClient.searchNotes(
+            const result = await this.apiClient.notes.searchNotes(
               args.query as string,
               args.type as string | undefined,
             );
@@ -1626,7 +1628,9 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_note': {
-            const result = await this.apiClient.getNote(args.note_id as string);
+            const result = await this.apiClient.notes.getNote(
+              args.note_id as string,
+            );
             return {
               content: [
                 {
@@ -1638,7 +1642,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'create_note': {
-            const result = (await this.apiClient.createNote(
+            const result = (await this.apiClient.notes.createNote(
               args.title as string,
               args.body as string,
               args.notebook_id as string | undefined,
@@ -1667,7 +1671,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
             if (args.todo_completed !== undefined)
               updates.todo_completed = args.todo_completed;
 
-            const result = (await this.apiClient.updateNote(
+            const result = (await this.apiClient.notes.updateNote(
               args.note_id as string,
               updates,
             )) as { title: string; id: string };
@@ -1682,7 +1686,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'append_to_note': {
-            await this.apiClient.appendToNote(
+            await this.apiClient.notes.appendToNote(
               args.note_id as string,
               args.content as string,
             );
@@ -1697,7 +1701,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'prepend_to_note': {
-            await this.apiClient.prependToNote(
+            await this.apiClient.notes.prependToNote(
               args.note_id as string,
               args.content as string,
             );
@@ -1712,7 +1716,10 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'delete_note': {
-            await this.apiClient.deleteNote(args.note_id as string, false);
+            await this.apiClient.notes.deleteNote(
+              args.note_id as string,
+              false,
+            );
             return {
               content: [
                 {
@@ -1725,7 +1732,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           // Tag Management
           case 'add_tags_to_note': {
-            await this.apiClient.addTagsToNote(
+            await this.apiClient.tags.addTagsToNote(
               args.note_id as string,
               args.tags as string,
             );
@@ -1740,7 +1747,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'remove_tags_from_note': {
-            await this.apiClient.removeTagsFromNote(
+            await this.apiClient.tags.removeTagsFromNote(
               args.note_id as string,
               args.tags as string,
             );
@@ -1755,7 +1762,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'list_tags': {
-            const result = await this.apiClient.listTags(
+            const result = await this.apiClient.tags.listTags(
               args.fields as string | undefined,
               args.order_by as string | undefined,
               args.order_dir as 'ASC' | 'DESC' | undefined,
@@ -1773,12 +1780,12 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           case 'rename_tag': {
             if (args.tag_id) {
-              await this.apiClient.renameTag(
+              await this.apiClient.tags.renameTag(
                 args.tag_id as string,
                 args.new_name as string,
               );
             } else if (args.current_name) {
-              await this.apiClient.renameTagByName(
+              await this.apiClient.tags.renameTagByName(
                 args.current_name as string,
                 args.new_name as string,
               );
@@ -1797,7 +1804,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'delete_tag': {
-            await this.apiClient.deleteTag(args.tag_id as string);
+            await this.apiClient.tags.deleteTag(args.tag_id as string);
             return {
               content: [
                 {
@@ -1809,7 +1816,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_tag_by_id': {
-            const result = await this.apiClient.getTag(
+            const result = await this.apiClient.tags.getTag(
               args.tag_id as string,
               args.fields as string | undefined,
             );
@@ -1826,7 +1833,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           case 'get_notes_by_tag': {
             let result;
             if (args.tag_id) {
-              result = await this.apiClient.getTagNotes(
+              result = await this.apiClient.tags.getTagNotes(
                 args.tag_id as string,
                 args.fields as string | undefined,
                 args.order_by as string | undefined,
@@ -1834,7 +1841,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
                 args.limit as number | undefined,
               );
             } else if (args.tag_name) {
-              result = await this.apiClient.getNotesByTagName(
+              result = await this.apiClient.tags.getNotesByTagName(
                 args.tag_name as string,
                 args.fields as string | undefined,
                 args.order_by as string | undefined,
@@ -1857,7 +1864,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           // Resource Operations
           case 'list_all_resources': {
-            const result = await this.apiClient.listAllResources(
+            const result = await this.apiClient.resources.listAllResources(
               args.fields as string | undefined,
               args.order_by as string | undefined,
               args.order_dir as 'ASC' | 'DESC' | undefined,
@@ -1874,7 +1881,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_resource_metadata': {
-            const result = await this.apiClient.getResourceMetadata(
+            const result = await this.apiClient.resources.getResourceMetadata(
               args.resource_id as string,
             );
             return {
@@ -1888,7 +1895,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_note_attachments': {
-            const result = await this.apiClient.getNoteResources(
+            const result = await this.apiClient.resources.getNoteResources(
               args.note_id as string,
               args.fields as string | undefined,
               args.order_by as string | undefined,
@@ -1906,7 +1913,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_resource_notes': {
-            const result = await this.apiClient.getResourceNotes(
+            const result = await this.apiClient.resources.getResourceNotes(
               args.resource_id as string,
               args.fields as string | undefined,
               args.order_by as string | undefined,
@@ -1924,7 +1931,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'download_attachment': {
-            await this.apiClient.downloadResourceToFile(
+            await this.apiClient.resources.downloadResourceToFile(
               args.resource_id as string,
               args.output_path as string,
             );
@@ -1939,7 +1946,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'upload_attachment': {
-            const result = (await this.apiClient.uploadResource(
+            const result = (await this.apiClient.resources.uploadResource(
               args.file_path as string,
               args.title as string,
               args.mime_type as string,
@@ -1964,14 +1971,14 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
               if (args.title) updates.title = args.title as string;
               if (args.mime_type) updates.mime = args.mime_type as string;
 
-              result = (await this.apiClient.updateResourceWithFile(
+              result = (await this.apiClient.resources.updateResourceWithFile(
                 args.resource_id as string,
                 args.file_path as string,
                 updates,
               )) as { title: string; id: string };
             } else if (args.title) {
               // Update metadata only
-              result = (await this.apiClient.updateResourceMetadata(
+              result = (await this.apiClient.resources.updateResourceMetadata(
                 args.resource_id as string,
                 { title: args.title as string },
               )) as { title: string; id: string };
@@ -1993,7 +2000,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           case 'delete_resource': {
             // Optional: Check for note references first
-            const notes = (await this.apiClient.getResourceNotes(
+            const notes = (await this.apiClient.resources.getResourceNotes(
               args.resource_id as string,
             )) as { items: unknown[] } | unknown[];
 
@@ -2012,7 +2019,9 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
               };
             }
 
-            await this.apiClient.deleteResource(args.resource_id as string);
+            await this.apiClient.resources.deleteResource(
+              args.resource_id as string,
+            );
 
             return {
               content: [
@@ -2026,7 +2035,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           // Revision Operations
           case 'list_all_revisions': {
-            const result = await this.apiClient.listAllRevisions(
+            const result = await this.apiClient.revisions.listAllRevisions(
               args.fields as string | undefined,
               args.order_by as string | undefined,
               args.order_dir as 'ASC' | 'DESC' | undefined,
@@ -2043,7 +2052,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'get_revision': {
-            const result = await this.apiClient.getRevision(
+            const result = await this.apiClient.revisions.getRevision(
               args.revision_id as string,
               args.fields as string | undefined,
             );

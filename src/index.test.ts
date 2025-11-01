@@ -382,7 +382,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      const result = await client.deleteNote('test-note-id', false);
+      const result = await client.notes.deleteNote('test-note-id', false);
 
       expect(result).toBeNull();
     });
@@ -438,7 +438,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      await client.searchNotes('test query with spaces', 'note');
+      await client.notes.searchNotes('test query with spaces', 'note');
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('query=test+query+with+spaces'),
@@ -462,7 +462,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      await client.createNote('Test Note', 'Test body', 'notebook-id');
+      await client.notes.createNote('Test Note', 'Test body', 'notebook-id');
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.any(String),
@@ -510,7 +510,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(updateNoteResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.appendToNote('123', 'New content');
+      await client.notes.appendToNote('123', 'New content');
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
       // Third call should be PUT with combined content
@@ -554,7 +554,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(updateNoteResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.prependToNote('123', 'New content');
+      await client.notes.prependToNote('123', 'New content');
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
       // Third call should be PUT with combined content
@@ -578,7 +578,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      await client.deleteNote('test-note-id', true);
+      await client.notes.deleteNote('test-note-id', true);
 
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('permanent=1'),
@@ -627,7 +627,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagAssociateResponse as unknown as Response); // POST /tags/tag-123/notes
 
       const client = new JoplinApiClient();
-      await client.createNote('Test Note', 'Body', undefined, 'work');
+      await client.notes.createNote('Test Note', 'Body', undefined, 'work');
 
       // Verify note was created without tags parameter
       expect(global.fetch).toHaveBeenNthCalledWith(
@@ -692,7 +692,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagAssociateResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.addTagsToNote('note-123', 'urgent');
+      await client.tags.addTagsToNote('note-123', 'urgent');
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
     });
@@ -719,7 +719,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagRemoveResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.removeTagsFromNote('note-123', 'draft');
+      await client.tags.removeTagsFromNote('note-123', 'draft');
 
       // Verify DELETE was called
       expect(global.fetch).toHaveBeenNthCalledWith(
@@ -770,7 +770,7 @@ describe('JoplinApiClient', () => {
       });
 
       const client = new JoplinApiClient();
-      await client.addTagsToNote('note-123', 'work, urgent');
+      await client.tags.addTagsToNote('note-123', 'work, urgent');
 
       expect(global.fetch).toHaveBeenCalledTimes(6);
     });
@@ -797,7 +797,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagAssociateResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.addTagsToNote('note-123', 'work');
+      await client.tags.addTagsToNote('note-123', 'work');
 
       // Should NOT call POST /tags (tag already exists)
       expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -837,7 +837,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      const result = await client.searchNotes('test');
+      const result = await client.notes.searchNotes('test');
 
       expect(result).toEqual([
         { id: '1', title: 'Note 1' },
@@ -893,7 +893,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(page3Response as unknown as Response);
 
       const client = new JoplinApiClient();
-      const result = await client.searchNotes('test');
+      const result = await client.notes.searchNotes('test');
 
       expect(result).toEqual([
         { id: '1', title: 'Note 1' },
@@ -936,7 +936,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      const result = await client.searchNotes('nonexistent');
+      const result = await client.notes.searchNotes('nonexistent');
 
       expect(result).toEqual([]);
       expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -961,7 +961,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      const result = await client.listNotebooks();
+      const result = await client.notebooks.listNotebooks();
 
       expect(result).toEqual([
         { id: 'folder-1', title: 'Folder 1' },
@@ -992,7 +992,7 @@ describe('JoplinApiClient', () => {
       );
 
       const client = new JoplinApiClient();
-      const result = await client.getNotebookNotes('folder-123');
+      const result = await client.notebooks.getNotebookNotes('folder-123');
 
       expect(result).toEqual([
         { id: 'note-1', title: 'Note 1' },
@@ -1031,7 +1031,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagsResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      const result = (await client.getNote('123')) as {
+      const result = (await client.notes.getNote('123')) as {
         tags: Array<{ id: string; title: string }>;
       };
 
@@ -1073,7 +1073,7 @@ describe('JoplinApiClient', () => {
         .mockResolvedValueOnce(tagAssociateResponse as unknown as Response);
 
       const client = new JoplinApiClient();
-      await client.createNote('Test Note', 'Body', undefined, 'newtag');
+      await client.notes.createNote('Test Note', 'Body', undefined, 'newtag');
 
       // Should search for tag, not find it, create it, and associate it
       expect(global.fetch).toHaveBeenCalledTimes(4);
