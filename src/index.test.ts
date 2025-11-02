@@ -384,7 +384,7 @@ describe('JoplinApiClient', () => {
       const client = new JoplinApiClient();
       const result = await client.notes.deleteNote('test-note-id', false);
 
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
     });
 
     it('should throw error on HTTP error status', async () => {
