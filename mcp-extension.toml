@@ -1,0 +1,94 @@
+# Configuration for converting joplin-mcp to a Gemini CLI extension
+# Use with: npx mcp-to-extension
+
+[discovery_server]
+command = "node"
+args = ["./dist/index.js"]
+
+[discovery_server.env]
+# Optional: If you want to test with a specific token during build
+# JOPLIN_TOKEN = "${JOPLIN_TOKEN}"
+
+[runtime_server]
+command = "node"
+args = ["./dist/index.js"]
+# Bundle the compiled server and its dependencies
+files = ["./dist", "./node_modules", "./package.json"]
+
+[runtime_server.env]
+# The extension will prompt users to set this
+JOPLIN_TOKEN = "${JOPLIN_TOKEN}"
+
+# Optional: Add custom context about Joplin MCP
+prepend_tool_context = """
+# Joplin Notes Extension
+
+This extension provides tools for managing your Joplin notes through the Model Context Protocol (MCP).
+
+## Prerequisites
+- Joplin desktop app must be running
+- Web Clipper service must be enabled in Joplin (Tools → Options → Web Clipper)
+- JOPLIN_TOKEN environment variable must be set with your API token
+
+## Quick Start
+Use the tools below to search, create, update, and manage your Joplin notes, notebooks, tags, and attachments.
+"""
+
+# Define slash commands for common workflows
+[[slash_commands]]
+name = "joplin"
+description = "General Joplin operations - smart router"
+prompt = """
+You are a Joplin assistant that helps users manage their notes.
+
+User input: {{args}}
+
+Analyze the request and call the appropriate tool:
+- For searching: use search_notes with intelligent queries (use OR logic with synonyms)
+- For creating: use create_note
+- For updating: use update_note, append_to_note, or prepend_to_note
+- For listing: use list_notebooks, list_all_notes, or list_tags
+- For organizing: use move_note_to_notebook, add_tags_to_note, or remove_tags_from_note
+"""
+
+[[slash_commands]]
+name = "joplin-search"
+description = "Search through Joplin notes"
+prompt = """
+You are a search assistant for Joplin notes.
+
+User input: {{args}}
+
+Parse the search intent and use search_notes with intelligent queries.
+
+CRITICAL: Use OR logic with synonyms for broad matching:
+- Example: "docker" → search "any:1 docker container containerization kubernetes"
+- Always prefer returning results over no results
+"""
+
+[[slash_commands]]
+name = "joplin-create"
+description = "Create a new note in Joplin"
+prompt = """
+You are a note creation assistant.
+
+User input: {{args}}
+
+Parse the title, content, and optional notebook/tags, then call create_note.
+If a notebook is specified, first use list_notebooks to find its ID.
+"""
+
+[[slash_commands]]
+name = "joplin-notebooks"
+description = "Manage Joplin notebooks"
+prompt = """
+You are a notebook management assistant.
+
+User input: {{args}}
+
+Help users:
+- List notebooks (list_notebooks)
+- Create notebooks (create_notebook)
+- View notebook contents (get_notebook_notes)
+- Organize notebooks (update_notebook)
+"""

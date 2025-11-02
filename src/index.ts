@@ -6,10 +6,6 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { resolve } from 'path';
-import { realpathSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { program } from 'commander';
 import { getVersion } from './version.js';
 import { JoplinApiClient } from './api/client.js';
 
@@ -2092,79 +2088,6 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
     });
   }
 
-  /**
-   * Generate Gemini CLI-compatible TOML configuration
-   */
-  generateToml(): string {
-    // Get the tools list by manually extracting from the schema
-    // This is the same list we return from ListToolsRequestSchema
-    const tools = this.getToolsList();
-
-    let toml = 'description = "Interact with the Joplin note-taking app."\n';
-    toml += 'prompt = """\n';
-    toml += 'You are a command parser for the Joplin extension.\n';
-    toml += '\n';
-    toml += 'User input: {{args}}\n';
-    toml += '\n';
-    toml += "Parse the user's input and call the appropriate Joplin tool.\n";
-    toml += '"""\n';
-    toml += '\n';
-    toml += '[tools]\n';
-
-    for (const tool of tools) {
-      // Get first line of description for TOML (strip strategic guidance for brevity)
-      const firstLine =
-        tool.description
-          .split('\n')
-          .filter(
-            (line) => line.trim() && !line.includes('STRATEGIC GUIDANCE'),
-          )[0]
-          ?.trim() ||
-        tool.description.split('\n')[0]?.trim() ||
-        'No description';
-
-      toml += `${tool.name} = {\n`;
-      toml += `  description = "${this.escapeTomlString(firstLine)}",\n`;
-      toml += `  args = {\n`;
-
-      const properties = tool.inputSchema?.properties || {};
-      const propertyEntries = Object.entries(properties);
-
-      for (let i = 0; i < propertyEntries.length; i++) {
-        const [key, schema] = propertyEntries[i];
-        const description =
-          (schema as { description?: string }).description || '';
-        const isLast = i === propertyEntries.length - 1;
-        toml += `    ${key} = "${this.escapeTomlString(description)}"${isLast ? '' : ','}\n`;
-      }
-
-      toml += `  }\n`;
-      toml += `}\n`;
-      toml += '\n';
-    }
-
-    return toml;
-  }
-
-  /**
-   * Escape special characters for TOML strings
-   */
-  private escapeTomlString(str: string): string {
-    return str
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, ' ')
-      .replace(/\r/g, '')
-      .replace(/\t/g, ' ');
-  }
-
-  /**
-   * Get the tools list (same as what ListToolsRequestSchema returns)
-   */
-  private getToolsList() {
-    return this.getToolsDefinitions();
-  }
-
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -2187,44 +2110,10 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
   }
 }
 
-// Only run CLI logic if this is the main module (not imported for tests)
-// Check if we're being run directly by comparing the URL to the actual resolved path
-// Use realpathSync to resolve symlinks for both paths
-const scriptPath = process.argv[1]
-  ? realpathSync(resolve(process.argv[1]))
-  : '';
-const modulePath = realpathSync(fileURLToPath(import.meta.url));
-const isMainModule = scriptPath && modulePath === scriptPath;
-
-if (isMainModule) {
-  // Parse command line arguments
-  program
-    .option(
-      '--generate-toml',
-      'Generate Gemini CLI TOML configuration and exit',
-    )
-    .parse(process.argv);
-
-  const options = program.opts();
-
-  if (options.generateToml) {
-    // Generate TOML and exit
-    // Suppress stderr output during TOML generation
-    const originalStderrWrite = process.stderr.write.bind(process.stderr);
-    process.stderr.write = (() => true) as typeof process.stderr.write;
-
-    const server = new JoplinServer();
-
-    // Restore stderr
-    process.stderr.write = originalStderrWrite;
-
-    console.log(server.generateToml());
-    process.exit(0);
-  } else {
-    // Start MCP server normally
-    const server = new JoplinServer();
-    server.run().catch(() => {
-      process.exit(1);
-    });
-  }
+// Only run if this is the main module (not imported for tests)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const server = new JoplinServer();
+  server.run().catch(() => {
+    process.exit(1);
+  });
 }
