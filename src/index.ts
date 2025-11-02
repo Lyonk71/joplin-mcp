@@ -1497,10 +1497,10 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'create_notebook': {
-            const result = (await this.apiClient.notebooks.createNotebook(
+            const result = await this.apiClient.notebooks.createNotebook(
               args.title as string,
               args.parent_id as string | undefined,
-            )) as { title: string; id: string };
+            );
             return {
               content: [
                 {
@@ -1534,10 +1534,10 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
             if (args.title) updates.title = args.title as string;
             if (args.parent_id) updates.parent_id = args.parent_id as string;
 
-            const result = (await this.apiClient.notebooks.updateNotebook(
+            const result = await this.apiClient.notebooks.updateNotebook(
               args.notebook_id as string,
               updates,
-            )) as { title: string; id: string };
+            );
 
             return {
               content: [
@@ -1642,7 +1642,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'create_note': {
-            const result = (await this.apiClient.notes.createNote(
+            const result = await this.apiClient.notes.createNote(
               args.title as string,
               args.body as string,
               args.notebook_id as string | undefined,
@@ -1650,7 +1650,7 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
               args.is_todo as number | undefined,
               args.todo_due as number | undefined,
               args.todo_completed as number | undefined,
-            )) as { title: string; id: string };
+            );
             return {
               content: [
                 {
@@ -1671,10 +1671,10 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
             if (args.todo_completed !== undefined)
               updates.todo_completed = args.todo_completed;
 
-            const result = (await this.apiClient.notes.updateNote(
+            const result = await this.apiClient.notes.updateNote(
               args.note_id as string,
               updates,
-            )) as { title: string; id: string };
+            );
             return {
               content: [
                 {
@@ -1946,11 +1946,11 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
           }
 
           case 'upload_attachment': {
-            const result = (await this.apiClient.resources.uploadResource(
+            const result = await this.apiClient.resources.uploadResource(
               args.file_path as string,
               args.title as string,
               args.mime_type as string,
-            )) as { id: string; title: string };
+            );
 
             return {
               content: [
@@ -1971,17 +1971,17 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
               if (args.title) updates.title = args.title as string;
               if (args.mime_type) updates.mime = args.mime_type as string;
 
-              result = (await this.apiClient.resources.updateResourceWithFile(
+              result = await this.apiClient.resources.updateResourceWithFile(
                 args.resource_id as string,
                 args.file_path as string,
                 updates,
-              )) as { title: string; id: string };
+              );
             } else if (args.title) {
               // Update metadata only
-              result = (await this.apiClient.resources.updateResourceMetadata(
+              result = await this.apiClient.resources.updateResourceMetadata(
                 args.resource_id as string,
                 { title: args.title as string },
-              )) as { title: string; id: string };
+              );
             } else {
               throw new Error(
                 'Must provide either file_path or title to update',
@@ -2000,20 +2000,16 @@ USE CASE: Recovering accidentally deleted content, understanding who changed wha
 
           case 'delete_resource': {
             // Optional: Check for note references first
-            const notes = (await this.apiClient.resources.getResourceNotes(
+            const notes = await this.apiClient.resources.getResourceNotes(
               args.resource_id as string,
-            )) as { items: unknown[] } | unknown[];
+            );
 
-            const items = Array.isArray(notes)
-              ? notes
-              : (notes as { items: unknown[] }).items;
-
-            if (items && items.length > 0) {
+            if (notes && notes.length > 0) {
               return {
                 content: [
                   {
                     type: 'text',
-                    text: `Warning: This resource is used in ${items.length} note(s). Deleting it will break those references.\n\n${JSON.stringify(notes, null, 2)}`,
+                    text: `Warning: This resource is used in ${notes.length} note(s). Deleting it will break those references.\n\n${JSON.stringify(notes, null, 2)}`,
                   },
                 ],
               };
