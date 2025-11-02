@@ -1,4 +1,5 @@
 import { HttpClient } from './http-client.js';
+import type { JoplinNote, JoplinTag } from '../types/joplin.js';
 
 /**
  * Note operations
@@ -21,7 +22,7 @@ export class NotesApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote[]> {
     const fieldsParam =
       fields ||
       'id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed';
@@ -40,13 +41,16 @@ export class NotesApi extends HttpClient {
     return this.paginatedRequest(endpoint, limit);
   }
 
-  async searchNotes(query: string, type?: string): Promise<unknown> {
+  async searchNotes(query: string, type?: string): Promise<JoplinNote[]> {
     let url = `/search?query=${encodeURIComponent(query)}`;
     if (type) url += `&type=${type}`;
     return this.paginatedRequest(url);
   }
 
-  async getNote(noteId: string, fields?: string): Promise<unknown> {
+  async getNote(
+    noteId: string,
+    fields?: string,
+  ): Promise<JoplinNote & { tags?: JoplinTag[] }> {
     const fieldsParam =
       fields ||
       'id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed';
@@ -56,7 +60,7 @@ export class NotesApi extends HttpClient {
     ]);
 
     // Combine the results
-    return { ...(note as Record<string, unknown>), tags };
+    return { ...(note as JoplinNote), tags: tags as JoplinTag[] };
   }
 
   async createNote(
@@ -67,7 +71,7 @@ export class NotesApi extends HttpClient {
     isTodo?: number,
     todoDue?: number,
     todoCompleted?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote> {
     const noteData: Record<string, unknown> = { title, body };
     if (notebookId) noteData.parent_id = notebookId;
     if (isTodo !== undefined) noteData.is_todo = isTodo;
@@ -75,9 +79,7 @@ export class NotesApi extends HttpClient {
     if (todoCompleted !== undefined) noteData.todo_completed = todoCompleted;
 
     // Create note first (API doesn't accept tags parameter)
-    const note = (await this.request('POST', '/notes', noteData)) as {
-      id: string;
-    };
+    const note = (await this.request('POST', '/notes', noteData)) as JoplinNote;
 
     // Then add tags if provided
     if (tags && this.tagsApi) {
@@ -90,31 +92,35 @@ export class NotesApi extends HttpClient {
   async updateNote(
     noteId: string,
     updates: Record<string, unknown>,
-  ): Promise<unknown> {
-    return this.request('PUT', `/notes/${noteId}`, updates);
+  ): Promise<JoplinNote> {
+    return this.request(
+      'PUT',
+      `/notes/${noteId}`,
+      updates,
+    ) as Promise<JoplinNote>;
   }
 
-  async appendToNote(noteId: string, content: string): Promise<unknown> {
-    const note = (await this.getNote(noteId, 'id,body')) as { body: string };
+  async appendToNote(noteId: string, content: string): Promise<JoplinNote> {
+    const note = await this.getNote(noteId, 'id,body');
     const updatedBody = note.body + '\n\n' + content;
     return this.updateNote(noteId, { body: updatedBody });
   }
 
-  async prependToNote(noteId: string, content: string): Promise<unknown> {
-    const note = (await this.getNote(noteId, 'id,body')) as { body: string };
+  async prependToNote(noteId: string, content: string): Promise<JoplinNote> {
+    const note = await this.getNote(noteId, 'id,body');
     const updatedBody = content + '\n\n' + note.body;
     return this.updateNote(noteId, { body: updatedBody });
   }
 
-  async deleteNote(noteId: string, permanent = false): Promise<unknown> {
+  async deleteNote(noteId: string, permanent = false): Promise<void> {
     const url = permanent ? `/notes/${noteId}?permanent=1` : `/notes/${noteId}`;
-    return this.request('DELETE', url);
+    await this.request('DELETE', url);
   }
 
   async moveNoteToNotebook(
     noteId: string,
     notebookId: string,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote> {
     return this.updateNote(noteId, { parent_id: notebookId });
   }
 }

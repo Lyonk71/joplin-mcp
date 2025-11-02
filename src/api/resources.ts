@@ -1,4 +1,5 @@
 import { HttpClient } from './http-client.js';
+import type { JoplinResource, JoplinNote } from '../types/joplin.js';
 
 /**
  * Resource (attachment) operations
@@ -12,7 +13,7 @@ export class ResourcesApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinResource[]> {
     const fieldsParam =
       fields ||
       'id,title,mime,filename,size,created_time,updated_time,file_extension,ocr_text,ocr_status';
@@ -34,7 +35,7 @@ export class ResourcesApi extends HttpClient {
   async getResourceMetadata(
     resourceId: string,
     fields?: string,
-  ): Promise<unknown> {
+  ): Promise<JoplinResource> {
     const fieldsParam =
       fields ||
       'id,title,mime,filename,size,file_extension,created_time,updated_time,blob_updated_time,is_shared,share_id,ocr_text,ocr_status';
@@ -42,7 +43,7 @@ export class ResourcesApi extends HttpClient {
     return this.request(
       'GET',
       `/resources/${resourceId}?fields=${fieldsParam}`,
-    );
+    ) as Promise<JoplinResource>;
   }
 
   /**
@@ -54,7 +55,7 @@ export class ResourcesApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinResource[]> {
     const fieldsParam =
       fields ||
       'id,title,mime,filename,size,file_extension,created_time,updated_time';
@@ -78,7 +79,7 @@ export class ResourcesApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote[]> {
     const fieldsParam =
       fields || 'id,title,parent_id,created_time,updated_time';
 
@@ -127,7 +128,7 @@ export class ResourcesApi extends HttpClient {
     filePath: string,
     title: string,
     mimeType: string,
-  ): Promise<unknown> {
+  ): Promise<JoplinResource> {
     const fs = await import('fs');
     const FormData = (await import('form-data')).default;
 
@@ -165,7 +166,7 @@ export class ResourcesApi extends HttpClient {
     resourceId: string,
     filePath: string,
     updates: { title?: string; mime?: string },
-  ): Promise<unknown> {
+  ): Promise<JoplinResource> {
     const fs = await import('fs');
     const FormData = (await import('form-data')).default;
 
@@ -203,8 +204,12 @@ export class ResourcesApi extends HttpClient {
   async updateResourceMetadata(
     resourceId: string,
     updates: { title?: string },
-  ): Promise<unknown> {
-    return this.request('PUT', `/resources/${resourceId}`, updates);
+  ): Promise<JoplinResource> {
+    return this.request(
+      'PUT',
+      `/resources/${resourceId}`,
+      updates,
+    ) as Promise<JoplinResource>;
   }
 
   /**

@@ -1,4 +1,5 @@
 import { HttpClient } from './http-client.js';
+import type { JoplinRevision } from '../types/joplin.js';
 
 /**
  * Revision operations
@@ -12,7 +13,7 @@ export class RevisionsApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinRevision[]> {
     const fieldsParam =
       fields ||
       'id,parent_id,item_type,item_id,item_updated_time,created_time,updated_time';
@@ -29,13 +30,16 @@ export class RevisionsApi extends HttpClient {
   /**
    * Get a specific revision by ID
    */
-  async getRevision(revisionId: string, fields?: string): Promise<unknown> {
+  async getRevision(
+    revisionId: string,
+    fields?: string,
+  ): Promise<JoplinRevision> {
     const fieldsParam =
       fields ||
       'id,parent_id,item_type,item_id,item_updated_time,title_diff,body_diff,metadata_diff,encryption_applied,encryption_cipher_text,created_time,updated_time';
     return this.request(
       'GET',
       `/revisions/${revisionId}?fields=${fieldsParam}`,
-    );
+    ) as Promise<JoplinRevision>;
   }
 }

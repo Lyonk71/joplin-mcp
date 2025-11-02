@@ -1,4 +1,5 @@
 import { HttpClient } from './http-client.js';
+import type { JoplinTag, JoplinNote } from '../types/joplin.js';
 
 /**
  * Tag operations
@@ -109,7 +110,7 @@ export class TagsApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinTag[]> {
     const fieldsParam = fields || 'id,title,created_time,updated_time';
     let endpoint = `/tags?fields=${fieldsParam}`;
     if (orderBy) {
@@ -124,22 +125,27 @@ export class TagsApi extends HttpClient {
   /**
    * Get a specific tag by ID
    */
-  async getTag(tagId: string, fields?: string): Promise<unknown> {
+  async getTag(tagId: string, fields?: string): Promise<JoplinTag> {
     const fieldsParam = fields || 'id,title,created_time,updated_time';
-    return this.request('GET', `/tags/${tagId}?fields=${fieldsParam}`);
+    return this.request(
+      'GET',
+      `/tags/${tagId}?fields=${fieldsParam}`,
+    ) as Promise<JoplinTag>;
   }
 
   /**
    * Rename a tag by ID
    */
-  async renameTag(tagId: string, newName: string): Promise<unknown> {
-    return this.request('PUT', `/tags/${tagId}`, { title: newName });
+  async renameTag(tagId: string, newName: string): Promise<JoplinTag> {
+    return this.request('PUT', `/tags/${tagId}`, {
+      title: newName,
+    }) as Promise<JoplinTag>;
   }
 
   /**
    * Rename a tag by name (finds tag by old name, then renames it)
    */
-  async renameTagByName(oldName: string, newName: string): Promise<unknown> {
+  async renameTagByName(oldName: string, newName: string): Promise<JoplinTag> {
     if (!this.notesApi) {
       throw new Error('NotesApi not set');
     }
@@ -164,8 +170,8 @@ export class TagsApi extends HttpClient {
   /**
    * Delete a tag by ID
    */
-  async deleteTag(tagId: string): Promise<unknown> {
-    return this.request('DELETE', `/tags/${tagId}`);
+  async deleteTag(tagId: string): Promise<void> {
+    await this.request('DELETE', `/tags/${tagId}`);
   }
 
   /**
@@ -177,7 +183,7 @@ export class TagsApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote[]> {
     const fieldsParam =
       fields ||
       'id,title,body,parent_id,created_time,updated_time,user_created_time,user_updated_time,is_todo,todo_completed';
@@ -201,7 +207,7 @@ export class TagsApi extends HttpClient {
     orderBy?: string,
     orderDir?: 'ASC' | 'DESC',
     limit?: number,
-  ): Promise<unknown> {
+  ): Promise<JoplinNote[]> {
     if (!this.notesApi) {
       throw new Error('NotesApi not set');
     }
