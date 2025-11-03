@@ -1,5 +1,5 @@
 {
-  "name": "joplin-mcp",
+  "name": "@belsar-ai/joplin-mcp",
   "version": "0.2.2",
   "type": "module",
   "description": "Model Context Protocol (MCP) server for Joplin note-taking app",
@@ -47,11 +47,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lyonk71/joplin-mcp.git"
+    "url": "git+https://github.com/belsar-ai/joplin-mcp.git"
   },
-  "homepage": "https://github.com/Lyonk71/joplin-mcp#readme",
+  "homepage": "https://github.com/belsar-ai/joplin-mcp#readme",
   "bugs": {
-    "url": "https://github.com/Lyonk71/joplin-mcp/issues"
+    "url": "https://github.com/belsar-ai/joplin-mcp/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

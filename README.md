@@ -37,7 +37,7 @@ Add this to your Claude Desktop config file (`~/Library/Application Support/Clau
   "mcpServers": {
     "joplin": {
       "command": "npx",
-      "args": ["-y", "joplin-mcp"],
+      "args": ["-y", "@belsar-ai/joplin-mcp"],
       "env": {
         "JOPLIN_TOKEN": "your_joplin_api_token_here"
       }
@@ -55,7 +55,7 @@ Add this to your Cline MCP settings:
   "mcpServers": {
     "joplin": {
       "command": "npx",
-      "args": ["-y", "joplin-mcp"],
+      "args": ["-y", "@belsar-ai/joplin-mcp"],
       "env": {
         "JOPLIN_TOKEN": "your_joplin_api_token_here"
       }
@@ -69,7 +69,7 @@ Add this to your Cline MCP settings:
 Use the standard MCP configuration format with:
 
 - **Command**: `npx`
-- **Args**: `["-y", "joplin-mcp"]`
+- **Args**: `["-y", "@belsar-ai/joplin-mcp"]`
 - **Environment**: `JOPLIN_TOKEN=your_token_here`
 
 ### Direct Usage
@@ -77,7 +77,7 @@ Use the standard MCP configuration format with:
 You can also install and run directly with Node.js:
 
 ```bash
-npm install -g joplin-mcp
+npm install -g @belsar-ai/joplin-mcp
 JOPLIN_TOKEN=your_token_here joplin-mcp
 ```
 
@@ -106,7 +106,7 @@ The MCP server exposes these tool endpoints:
 ### Setup
 
 ```bash
-git clone https://github.com/Lyonk71/joplin-mcp.git
+git clone https://github.com/belsar-ai/joplin-mcp.git
 cd joplin-mcp
 npm install
 ```
@@ -144,11 +144,11 @@ This project uses automated npm publishing via GitHub Actions with npm's Trusted
 
 Configure npm Trusted Publisher (maintainers only):
 
-1. Go to https://www.npmjs.com/package/joplin-mcp/access
+1. Go to https://www.npmjs.com/package/@belsar-ai/joplin-mcp/access
 2. Click "Automated Publishing" → "Add Trusted Publisher"
 3. Select "GitHub Actions"
 4. Enter:
-   - **Repository owner**: `Lyonk71`
+   - **Repository owner**: `belsar-ai`
    - **Repository name**: `joplin-mcp`
    - **Workflow file**: `publish.yaml`
    - **Environment**: (leave empty)
@@ -209,7 +209,7 @@ Apache-2.0
 
 ## Links
 
-- [GitHub Repository](https://github.com/Lyonk71/joplin-mcp)
-- [Report Issues](https://github.com/Lyonk71/joplin-mcp/issues)
+- [GitHub Repository](https://github.com/belsar-ai/joplin-mcp)
+- [Report Issues](https://github.com/belsar-ai/joplin-mcp/issues)
 - [Joplin Website](https://joplinapp.org/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)

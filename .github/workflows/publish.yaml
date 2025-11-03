@@ -67,5 +67,5 @@ jobs:
           gh release create ${{ github.ref_name }} \
              --generate-notes \
              --title "Release ${{ github.ref_name }}" \
-             --notes "Published to npm as \`${{ steps.npm-tag.outputs.tag }}\`: https://www.npmjs.com/package/joplin-mcp" \
+             --notes "Published to npm as \`${{ steps.npm-tag.outputs.tag }}\`: https://www.npmjs.com/package/@belsar-ai/joplin-mcp" \
              $PRERELEASE_FLAG
