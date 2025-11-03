@@ -158,25 +158,25 @@ Configure npm Trusted Publisher (maintainers only):
 **For stable releases:**
 
 ```bash
-npm run release:patch   # 1.0.0 → 1.0.1 (bug fixes)
-npm run release:minor   # 1.0.0 → 1.1.0 (new features)
-npm run release:major   # 1.0.0 → 2.0.0 (breaking changes)
-git push && git push --tags
+make release-patch   # 0.2.2 → 0.2.3 (bug fixes)
+make release-minor   # 0.2.0 → 0.3.0 (new features)
+make release-major   # 0.2.0 → 1.0.0 (breaking changes)
+git push origin main --tags
 ```
 
 **For beta releases:**
 
 ```bash
-npm run release:beta    # 1.0.0 → 1.0.1-beta.0
-git push && git push --tags
+make release-beta    # 0.2.2 → 0.2.3-beta.0
+git push origin main --tags
 ```
 
 **To promote a tested beta to stable:**
 
 ```bash
-git checkout v1.1.0-beta.0   # Checkout tested beta
-git tag v1.1.0               # Tag without -beta suffix
-git push origin v1.1.0       # Publishes to latest
+git checkout v0.3.0-beta.0   # Checkout tested beta
+git tag v0.3.0               # Tag without -beta suffix
+git push origin v0.3.0       # Publishes to latest
 ```
 
 The GitHub Action automatically:
