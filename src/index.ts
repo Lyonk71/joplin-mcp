@@ -366,73 +366,43 @@ NOTE: This returns ALL notes, which can be a large dataset. Consider using more 
         name: 'search_notes',
         description: `Search for notes using Joplin's query syntax.
 
-CRITICAL SEARCH STRATEGY - READ THIS FIRST:
-When users ask questions like "do you have notes about X?", DO NOT search for their exact phrase. Instead, construct intelligent queries using these strategies:
+CRITICAL SEARCH STRATEGY:
+When users ask "do you have notes about X?", DO NOT search their exact phrase. Instead, use OR logic with synonyms:
 
-1. BROAD QUERIES (Default Approach):
-   - Use any:1 with multiple synonyms and related terms
-   - Example: User asks "linux installation steps" → Search: "any:1 linux install installation setup guide tutorial steps configure"
-   - Example: User asks "project documentation" → Search: "any:1 project initiative plan documentation docs readme guide"
-   - Rationale: A search returning 10 results you can filter is better than returning 0 results
+Examples:
+- User: "linux installation steps" → Query: "any:1 linux install installation setup guide tutorial configure"
+- User: "project documentation" → Query: "any:1 project initiative plan documentation docs readme"
+- User: "recent work notes" → Query: "tag:work updated:month-1"
 
-2. PRECISE QUERIES (When Specific):
-   - Use field filters when user specifies criteria
-   - Example: "recent work notes" → Search: "tag:work updated:month-1"
-   - Example: "notes with images" → Search: "resource:image/*"
+Key syntax:
+- OR logic: "any:1 term1 term2 term3" (matches any term)
+- Wildcards: "docker*" (matches docker, dockerfile, etc.)
+- Field filters: "tag:work", "title:meeting", "notebook:Personal"
+- Date filters: "updated:month-1", "created:2024"
+- Exclude: "-archived"
 
-3. NEVER DO THIS:
-   - ❌ Don't search exact user phrases: "do you have notes about docker" (will fail)
-   - ❌ Don't give up after one failed search
-   - ✅ Always try variations, wildcards, and broader OR queries
+Advanced filters (less obvious but powerful):
+- resource:image/*, resource:application/pdf (specific attachment types)
+- iscompleted:0|1 (todo completion status)
+- type:note|todo (limit by note vs todo)
 
-WHEN TO USE search_notes:
+NEVER DO THIS:
+- ❌ Search the user's literal question ("do you have notes about docker?")—it usually returns nothing. Always translate to broader concepts first.
+
+WHEN TO USE:
 - User asks "do you have notes about X?"
-- User provides keywords or topics to search
-- Looking for content based on concepts (not just titles)
+- Searching by keywords or concepts
 
-WHEN NOT TO USE search_notes:
-- For "all notes" or chronological lists → Use list_all_notes
-- User specifies a notebook/folder → Use get_notebook_notes
-- User specifies a single exact tag → Use get_notes_by_tag
+WHEN NOT TO USE:
+- For "all notes" → Use list_all_notes
+- Specific notebook → Use get_notebook_notes
+- Specific tag → Use get_notes_by_tag
 
 WORKFLOW:
-1. Construct a smart query (use OR logic + synonyms for concepts)
-2. Examine results (returns note IDs and titles)
-3. Use get_note to fetch full content of relevant results
-4. If zero results, try wildcards or broader terms
-
-QUERY SYNTAX REFERENCE:
-
-Basic:
-- Words: "linux kernel" (AND logic - both required)
-- Phrases: "shopping list" (exact phrase)
-- Wildcards: "swim*" (prefix match)
-- Exclusion: "-spam" (exclude term)
-- OR logic: "any:1 arch ubuntu fedora" (match any term)
-
-Field filters:
-- title:TERM - Search titles only
-- body:TERM - Search body text only
-- tag:TAG - Filter by tag (wildcards ok: tag:proj*)
-- notebook:NAME - Filter by notebook name
-- resource:MIME - Has attachment type (resource:image/*, resource:application/pdf)
-
-Date filters (formats: YYYYMMDD, YYYYMM, YYYY, day-7, month-1, year-0):
-- created:DATE - Creation date
-- updated:DATE - Last modified date
-- due:DATE - Todo due date
-
-Type filters:
-- type:note|todo - Item type
-- iscompleted:0|1 - Todo completion status
-
-Query examples:
-- Broad concept search: "any:1 kubernetes k8s docker container orchestration"
-- Title search: "title:linux tag:tutorial"
-- Recent work: "tag:work updated:month-1"
-- With images: "resource:image/*"
-- Exclude archived: "project -tag:archived"
-- Wildcard: "swim*" (finds swimming, swimmer, etc.)`,
+1. Construct query with OR logic + synonyms
+2. Examine results (IDs and titles)
+3. Use get_note for full content
+4. If zero results, try broader terms or wildcards`,
         inputSchema: {
           type: 'object',
           properties: {
