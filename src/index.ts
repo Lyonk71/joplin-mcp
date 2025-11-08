@@ -519,28 +519,25 @@ RETURNS: Created note object with id and title. Save the id if you need to refer
       },
       {
         name: 'update_note',
-        description: `Update an existing note's properties.
+        description: `Update an existing note.
 
-WHAT YOU CAN UPDATE:
-- title: Change the note's title
-- body: Replace entire content (WARNING: this overwrites existing content)
-- notebook_id: Move note to different notebook (same as move_note_to_notebook)
-- is_todo: Convert between regular note (0) and todo item (1)
-- todo_due: Set/update due date for todos (Unix timestamp in milliseconds)
-- todo_completed: Mark todo complete/incomplete (timestamp or 0)
+SUPPORTED FIELDS:
+- title (rename), notebook_id (move notebooks)
+- body (full replacement)
+- is_todo (0↔1), todo_due (due date), todo_completed (completion timestamp)
 
-WHAT YOU CANNOT UPDATE HERE:
-- Tags: Use add_tags_to_note or remove_tags_from_note instead
-- For appending/prepending content: Use append_to_note or prepend_to_note to avoid overwriting
+NOT COVERED:
+- Tag membership → use add_tags_to_note/remove_tags_from_note
+- Partial edits → use append_to_note or prepend_to_note
 
-WORKFLOW EXAMPLES:
-1. Rename note: update_note with note_id + new title
-2. Move to notebook: update_note with note_id + notebook_id (or use move_note_to_notebook)
-3. Convert to todo: update_note with note_id + is_todo=1 + optional todo_due timestamp
-4. Mark todo complete: update_note with note_id + todo_completed=[current_timestamp]
-5. Full rewrite: update_note with note_id + new body (replaces all content)
+QUICK RECIPES:
+- Rename: note_id + title
+- Move: note_id + notebook_id
+- Convert to todo: note_id + is_todo=1 (+optional todo_due)
+- Mark todo complete: note_id + todo_completed=[timestamp]
+- Rewrite body: note_id + body
 
-CAUTION: Updating the body replaces ALL existing content. To add content while preserving existing text, use append_to_note or prepend_to_note instead.`,
+WARNING: Setting body overwrites all existing content. Prefer append/prepend when you only need to add text.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -582,26 +579,13 @@ CAUTION: Updating the body replaces ALL existing content. To add content while p
       },
       {
         name: 'append_to_note',
-        description: `Add content to the end of an existing note while preserving existing content.
+        description: `Append new content to the end of a note without touching the existing body.
 
-WHEN TO USE:
-- Adding new information to an existing note
-- Logging updates or entries to a journal-style note
-- Appending meeting notes, ideas, or follow-ups
-- User says "add this to my note" or "append to note"
+USE WHEN: logging updates, adding follow-ups, or any "add this to my note" instruction. Use prepend_to_note when the user wants the content at the top, or update_note when they want a full rewrite.
 
-WHEN NOT TO USE:
-- Replacing entire note content → Use update_note with body parameter
-- Adding content at the beginning → Use prepend_to_note
+BEHAVIOR: Fetches the current body, adds two newlines (\\n\\n) plus your content, and saves the result.
 
-BEHAVIOR: Adds two newlines (\\n\\n) then your content to the end of the note's current body. This preserves the existing content and creates a visual separation.
-
-WORKFLOW:
-1. Get note_id (from search_notes or other list operations)
-2. Call append_to_note with the note_id and new content
-3. The tool automatically fetches current content, appends yours, and updates
-
-EXAMPLE: If note body is "# Meeting\\nAttendees: Alice, Bob" and you append "## Action Items\\n- Review proposal", the result is "# Meeting\\nAttendees: Alice, Bob\\n\\n## Action Items\\n- Review proposal"`,
+WORKFLOW: Provide note_id + content; the tool handles the fetch/append/update sequence automatically.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -619,26 +603,13 @@ EXAMPLE: If note body is "# Meeting\\nAttendees: Alice, Bob" and you append "## 
       },
       {
         name: 'prepend_to_note',
-        description: `Add content to the beginning of an existing note while preserving existing content.
+        description: `Prepend content to a note so the new text appears before the existing body.
 
-WHEN TO USE:
-- Adding high-priority information that should appear first
-- Inserting summary or overview before existing details
-- Adding timestamps or metadata at the top
-- User says "add this to the top of my note"
+USE WHEN: user wants summaries, alerts, timestamps, or other high-priority info at the top. Use append_to_note for bottom placement, or update_note for full rewrites.
 
-WHEN NOT TO USE:
-- Replacing entire note content → Use update_note with body parameter
-- Adding content at the end → Use append_to_note
+BEHAVIOR: Fetches the current body, inserts your content followed by two newlines (\\n\\n), then the original text.
 
-BEHAVIOR: Adds your content, then two newlines (\\n\\n), then the existing note body. This preserves existing content and creates visual separation.
-
-WORKFLOW:
-1. Get note_id (from search_notes or other list operations)
-2. Call prepend_to_note with the note_id and new content
-3. The tool automatically fetches current content, prepends yours, and updates
-
-EXAMPLE: If note body is "## Details\\nContent here" and you prepend "# Summary\\nQuick overview", the result is "# Summary\\nQuick overview\\n\\n## Details\\nContent here"`,
+WORKFLOW: Provide note_id + content; the tool handles the fetch/prepend/update process.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -656,29 +627,11 @@ EXAMPLE: If note body is "## Details\\nContent here" and you prepend "# Summary\
       },
       {
         name: 'delete_note',
-        description: `Delete a note by moving it to the trash.
+        description: `Soft-delete a note by moving it to Joplin's trash (recoverable in the UI; this is not a permanent delete).
 
-IMPORTANT BEHAVIOR: By default, this moves the note to Joplin's trash (soft delete). The note can be recovered from the trash in the Joplin UI. This tool does NOT perform permanent deletion.
+USE WHEN: the user explicitly wants a note removed or you're cleaning up duplicates/test notes. If the note might be important, confirm first and review it with get_note before deleting.
 
-WHEN TO USE:
-- User explicitly requests note deletion
-- Cleaning up duplicate or obsolete notes
-- Removing test notes or temporary content
-
-BEFORE DELETION (recommended):
-- Confirm with user if unsure
-- For important notes, consider using get_note to review content first
-- Check if note contains critical information
-
-WORKFLOW:
-1. Get note_id (from search_notes or list operations)
-2. Optionally call get_note to review content
-3. Call delete_note with the note_id
-4. Note moves to trash but is recoverable
-
-ALTERNATIVE OPERATIONS:
-- Moving to different notebook → Use move_note_to_notebook instead
-- Archiving with tags → Use add_tags_to_note to add "archived" tag instead`,
+ALTERNATIVES: move_note_to_notebook for reorganizing, add_tags_to_note (e.g., "archived") for retention without deletion.`,
         inputSchema: {
           type: 'object',
           properties: {
