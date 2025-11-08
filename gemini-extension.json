@@ -1,0 +1,10 @@
+{
+  "name": "joplin-mcp",
+  "version": "0.2.3",
+  "mcpServers": {
+    "joplin": {
+      "command": "node",
+      "args": ["${extensionPath}/dist/index.js"]
+    }
+  }
+}
