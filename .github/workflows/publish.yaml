@@ -62,7 +62,7 @@ jobs:
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" gemini-extension.json
 
       - name: Create release tarball for gemini-cli
-        run: tar -czf ../joplin-mcp-release.tar.gz --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='tests' . && mv ../joplin-mcp-release.tar.gz .
+        run: tar -czf ../joplin-mcp-release.tar.gz --exclude='.git' --exclude='.github' --exclude='tests' . && mv ../joplin-mcp-release.tar.gz .
 
       - name: Create GitHub Release
         env:
