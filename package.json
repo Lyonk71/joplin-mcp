@@ -19,7 +19,6 @@
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "prepare": "npm run build && (test -d .git && ./scripts/setup-husky.sh || true)",
-    "postinstall": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
