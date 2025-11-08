@@ -3,8 +3,8 @@
   "version": "0.3.0",
   "mcpServers": {
     "joplin": {
-      "command": "node",
-      "args": ["${extensionPath}/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@belsar-ai/joplin-mcp"]
     }
   }
 }
