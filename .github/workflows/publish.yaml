@@ -56,6 +56,14 @@ jobs:
       - name: Publish to npm (using OIDC Trusted Publisher)
         run: npm publish --tag ${{ steps.npm-tag.outputs.tag }}
 
+      - name: Update extension version from tag
+        run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/v//')
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" gemini-extension.json
+
+      - name: Create release tarball for gemini-cli
+        run: tar -czf ../joplin-mcp-release.tar.gz --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='tests' . && mv ../joplin-mcp-release.tar.gz .
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,4 +76,5 @@ jobs:
              --generate-notes \
              --title "Release ${{ github.ref_name }}" \
              --notes "Published to npm as \`${{ steps.npm-tag.outputs.tag }}\`: https://www.npmjs.com/package/@belsar-ai/joplin-mcp" \
-             $PRERELEASE_FLAG
+             $PRERELEASE_FLAG \
+             joplin-mcp-release.tar.gz
