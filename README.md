@@ -17,16 +17,22 @@ This MCP server enables AI assistants to interact with your Joplin notes through
 
 - Node.js 18.0.0 or higher
 - [Joplin desktop app](https://joplinapp.org/) with Web Clipper service enabled
-- Joplin API authorization token
 
 ### Enable Joplin Web Clipper
 
 1. Open Joplin desktop application
 2. Go to **Tools → Options → Web Clipper**
 3. Enable the Web Clipper service
-4. Note the authorization token shown
+
+After the Web Clipper is enabled, joplin-mcp will automatically discover the API token. If this doesn't work for you, add the `JOPLIN_TOKEN` environment variable to your `.bashrc` or shell configuration. You can find the token in **Tools → Options → Web Clipper** inside the Joplin desktop app.
 
 ## Installation
+
+### For Claude Code
+
+```bash
+claude mcp add --transport stdio joplin -- npx -y @belsar-ai/joplin-mcp
+```
 
 ### For Claude Desktop
 
@@ -37,10 +43,7 @@ Add this to your Claude Desktop config file (`~/Library/Application Support/Clau
   "mcpServers": {
     "joplin": {
       "command": "npx",
-      "args": ["-y", "@belsar-ai/joplin-mcp"],
-      "env": {
-        "JOPLIN_TOKEN": "your_joplin_api_token_here"
-      }
+      "args": ["-y", "@belsar-ai/joplin-mcp"]
     }
   }
 }
@@ -55,10 +58,7 @@ Add this to your Cline MCP settings:
   "mcpServers": {
     "joplin": {
       "command": "npx",
-      "args": ["-y", "@belsar-ai/joplin-mcp"],
-      "env": {
-        "JOPLIN_TOKEN": "your_joplin_api_token_here"
-      }
+      "args": ["-y", "@belsar-ai/joplin-mcp"]
     }
   }
 }
@@ -70,7 +70,6 @@ Use the standard MCP configuration format with:
 
 - **Command**: `npx`
 - **Args**: `["-y", "@belsar-ai/joplin-mcp"]`
-- **Environment**: `JOPLIN_TOKEN=your_token_here`
 
 ### Direct Usage
 
@@ -78,18 +77,8 @@ You can also install and run directly with Node.js:
 
 ```bash
 npm install -g @belsar-ai/joplin-mcp
-JOPLIN_TOKEN=your_token_here joplin-mcp
+joplin-mcp
 ```
-
-## API Token Setup
-
-To get your Joplin API token:
-
-1. Open Joplin
-2. Navigate to **Tools → Options → Web Clipper**
-3. Make sure "Enable Web Clipper Service" is checked
-4. Copy the authorization token displayed
-5. Use this token in the `JOPLIN_TOKEN` environment variable
 
 ## Available Tools
 
@@ -192,12 +181,8 @@ The GitHub Action automatically:
 
 - Verify Joplin desktop app is running
 - Confirm Web Clipper is enabled in Joplin settings
-- Check that your API token is correct
 - Ensure Joplin is listening on port 41184 (default)
-
-### Permission Errors
-
-Make sure the JOPLIN_TOKEN environment variable is set correctly with a valid authorization token.
+- If auto-discovery fails, set `JOPLIN_TOKEN` in your environment (add to `.bashrc` or shell config)
 
 ## Contributing
 
