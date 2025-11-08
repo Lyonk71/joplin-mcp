@@ -669,24 +669,11 @@ Useful for organizing notes, marking priorities, or categorizing content.`,
       },
       {
         name: 'remove_tags_from_note',
-        description: `Remove one or more tags from a note.
+        description: `Remove specific tags from a note. Tags that aren't present are ignored, so you can call this without checking first.
 
-BEHAVIOR: Silently ignores tags that don't exist or aren't currently on the note, so this operation is safe to call without checking tag existence first.
+USE WHEN: cleaning up classification (e.g., removing outdated or mistaken tags). For tag deletion across all notes, use delete_tag instead.
 
-WHEN TO USE:
-- User wants to remove specific tags from a note
-- Cleaning up note organization
-- Removing outdated or incorrect tags
-- Un-categorizing notes
-
-WORKFLOW:
-1. Get note_id (from search_notes or other operations)
-2. Call this tool with note_id + comma-separated tag names
-3. Only the specified tags are removed; other tags remain
-
-FORMAT: Provide tags as comma-separated names (e.g., "work,urgent" to remove both tags).
-
-NOTE: This only removes tag associations from the specific note. The tags themselves remain in Joplin and can still be used on other notes. To delete a tag entirely, use delete_tag.`,
+WORKFLOW: Provide note_id plus a comma-separated list of tag names (e.g., "work,urgent"); only those associations are removed.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -738,23 +725,13 @@ Returns tag IDs, names (titles), and timestamps. Supports optional sorting.`,
       },
       {
         name: 'rename_tag',
-        description: `Rename a tag across all notes that use it.
+        description: `Rename a tag everywhere it appears. Prefer current_name when you have the user-facing name; use tag_id only if you already fetched it.
 
-PARAMETER PREFERENCE: Prefer using current_name when you know the tag name from the user's request (e.g., "rename my 'work' tag to 'job'"). This is more intuitive. Only use tag_id if you already have the ID from a previous operation like list_tags.
+HOW TO CALL:
+- Provide new_name plus either current_name or tag_id (not both)
+- Change is immediate across all notes
 
-BEHAVIOR: All notes with this tag will automatically display the new name. This is a global rename operation that updates the tag everywhere it's used.
-
-WHEN TO USE:
-- User wants to fix tag naming (typos, better names, standardization)
-- Consolidating similar tags by renaming before deletion
-- Improving tag organization and clarity
-
-WORKFLOW:
-- Provide either current_name OR tag_id (not both)
-- Always provide new_name with the desired tag name
-- The change is immediate and affects all notes
-
-NOTE: This is safer than delete_tag + re-tagging because it preserves all tag associations.`,
+WHY USE IT: fixes typos, standardizes naming, or consolidates tags without losing associations—safer than delete_tag + manual retagging.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -777,22 +754,11 @@ NOTE: This is safer than delete_tag + re-tagging because it preserves all tag as
       },
       {
         name: 'delete_tag',
-        description: `Delete a tag from Joplin permanently.
+        description: `Delete a tag everywhere. ⚠️ This removes the tag from all notes that use it.
 
-⚠️ WARNING: This removes the tag from ALL notes that use it. This operation affects every note tagged with this tag across your entire Joplin database.
+USE WHEN: the tag is obsolete or user explicitly requests deletion. Before deleting, consider get_notes_by_tag to understand impact and confirm with the user if many notes are affected.
 
-RECOMMENDED WORKFLOW (before deletion):
-1. Call get_notes_by_tag to see which notes will be affected
-2. Confirm the impact with the user if many notes use this tag
-3. Consider rename_tag instead if the tag name just needs updating
-4. Only then proceed with delete_tag
-
-WHEN TO USE:
-- Cleaning up unused or obsolete tags
-- Removing duplicate or misspelled tags (after migrating notes)
-- User explicitly requests tag deletion and understands the scope
-
-ALTERNATIVE: If you just need to change the tag name, use rename_tag instead to preserve tag associations.`,
+ALTERNATIVE: If you just need a new name, use rename_tag to preserve associations.`,
         inputSchema: {
           type: 'object',
           properties: {
