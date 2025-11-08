@@ -34,6 +34,18 @@ After the Web Clipper is enabled, joplin-mcp will automatically discover the API
 claude mcp add --transport stdio joplin -- npx -y @belsar-ai/joplin-mcp
 ```
 
+### For Gemini CLI
+
+```bash
+gemini extensions install https://github.com/belsar-ai/joplin-mcp
+```
+
+Or for local development:
+
+```bash
+gemini extensions link /path/to/joplin-mcp
+```
+
 ### For Claude Desktop
 
 Add this to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
