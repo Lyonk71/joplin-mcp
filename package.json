@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "joplin-mcp": "dist/index.js"
+    "joplin-mcp": "dist/cli.js"
   },
   "files": [
     "dist",
