@@ -1,212 +1,81 @@
 # joplin-mcp
 
-Model Context Protocol (MCP) server for the [Joplin](https://joplinapp.org/) note-taking application.
+Model Context Protocol (MCP) server for the [Joplin](https://joplinapp.org/) note-taking app.
 
-This MCP server enables AI assistants to interact with your Joplin notes through a standardized protocol. It provides tools for searching, creating, updating, and managing notes, notebooks, tags, and resources.
+Designed by belsar.ai to be easy to install & enjoyable to use.
 
-## Features
+## Quick Start
 
-- **Search notes** by title, content, tags, or notebooks
-- **Create and update notes** with full markdown support
-- **Manage notebooks** - create, list, and organize
-- **Tag management** - add, remove, and search by tags
-- **Attach resources** - add images and files to notes
-- **Revision history** - access and restore previous note versions
-
-## Prerequisites
-
-- Node.js 18.0.0 or higher
-- [Joplin desktop app](https://joplinapp.org/) with Web Clipper service enabled
-
-### Enable Joplin Web Clipper
-
-1. Open Joplin desktop application
-2. Go to **Tools → Options → Web Clipper**
-3. Enable the Web Clipper service
-
-After the Web Clipper is enabled, joplin-mcp will automatically discover the API token. If this doesn't work for you, add the `JOPLIN_TOKEN` environment variable to your `.bashrc` or shell configuration. You can find the token in **Tools → Options → Web Clipper** inside the Joplin desktop app.
-
-## Installation
-
-### For Claude Code
+1. Open Joplin & navigate to tools > web clipper > enable web clipper service
+2. The Joplin app needs to remain running (minimized is fine)
+3. Pick the install command for your platform:
 
 ```bash
 claude mcp add --transport stdio joplin -- npx -y @belsar-ai/joplin-mcp
 ```
 
-### For Gemini CLI
+```bash
+codex mcp add joplin-mcp -- npx -y @belsar-ai/joplin-mcp
+```
 
 ```bash
 gemini extensions install https://github.com/belsar-ai/joplin-mcp
 ```
 
-Or for local development:
+4. That's it. Send a test request like "Find my notes about installing Fedora linux".
+
+## Uninstall
+
+To uninstall:
 
 ```bash
-gemini extensions link /path/to/joplin-mcp
+claude mcp remove joplin
 ```
-
-### For Claude Desktop
-
-Add this to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-
-```json
-{
-  "mcpServers": {
-    "joplin": {
-      "command": "npx",
-      "args": ["-y", "@belsar-ai/joplin-mcp"]
-    }
-  }
-}
-```
-
-### For Cline (VS Code Extension)
-
-Add this to your Cline MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "joplin": {
-      "command": "npx",
-      "args": ["-y", "@belsar-ai/joplin-mcp"]
-    }
-  }
-}
-```
-
-### For Other MCP Clients
-
-Use the standard MCP configuration format with:
-
-- **Command**: `npx`
-- **Args**: `["-y", "@belsar-ai/joplin-mcp"]`
-
-### Direct Usage
-
-You can also install and run directly with Node.js:
 
 ```bash
-npm install -g @belsar-ai/joplin-mcp
-joplin-mcp
+codex mcp remove joplin-mcp
 ```
-
-## Available Tools
-
-The MCP server exposes these tool endpoints:
-
-- **Notebooks** `list_notebooks`, `create_notebook`, `get_notebook_notes`, `update_notebook`, `delete_notebook`, `get_notebook_by_id`, `move_note_to_notebook`
-- **Notes** `list_all_notes`, `search_notes`, `get_note`, `create_note`, `update_note`, `append_to_note`, `prepend_to_note`, `delete_note`
-- **Tags** `add_tags_to_note`, `remove_tags_from_note`, `list_tags`, `rename_tag`, `delete_tag`, `get_tag_by_id`, `get_notes_by_tag`
-- **Resources** `list_all_resources`, `get_resource_metadata`, `get_note_attachments`, `get_resource_notes`, `download_attachment`, `upload_attachment`, `update_resource`, `delete_resource`
-- **Revisions** `list_all_revisions`, `get_revision`
-
-## Development
-
-### Setup
 
 ```bash
-git clone https://github.com/belsar-ai/joplin-mcp.git
-cd joplin-mcp
-npm install
+gemini extensions uninstall joplin-mcp
 ```
 
-### Build
+## Example Usage
 
-```bash
-npm run build
+```
+Find my notes about installing Arch Linux.
 ```
 
-### Test
-
-```bash
-npm test
+```
+Did you find any outdated info in my Arch Installation note?
 ```
 
-### Development Mode (watch mode)
-
-```bash
-npm run dev
+```
+Look for all notes whose last update time was before 2025. tag those as 'archived'.
 ```
 
-### Linting and Formatting
-
-```bash
-npm run format
-npm run lint
+```
+Show me all notes in my Work Projects notebook.
 ```
 
-## Releasing
-
-This project uses automated npm publishing via GitHub Actions with npm's Trusted Publishers (OIDC).
-
-### One-Time Setup
-
-Configure npm Trusted Publisher (maintainers only):
-
-1. Go to https://www.npmjs.com/package/@belsar-ai/joplin-mcp/access
-2. Click "Automated Publishing" → "Add Trusted Publisher"
-3. Select "GitHub Actions"
-4. Enter:
-   - **Repository owner**: `belsar-ai`
-   - **Repository name**: `joplin-mcp`
-   - **Workflow file**: `publish.yaml`
-   - **Environment**: (leave empty)
-
-### Creating Releases
-
-**For stable releases:**
-
-```bash
-make release-patch   # 0.2.2 → 0.2.3 (bug fixes)
-make release-minor   # 0.2.0 → 0.3.0 (new features)
-make release-major   # 0.2.0 → 1.0.0 (breaking changes)
-git push origin main --tags
+```
+Make a new note with a Mermaid diagram showing how a bill is passed on Capitol Hill.
 ```
 
-**For beta releases:**
+## Available Operations
 
-```bash
-make release-beta    # 0.2.2 → 0.2.3-beta.0
-git push origin main --tags
-```
-
-**To promote a tested beta to stable:**
-
-```bash
-git checkout v0.3.0-beta.0   # Checkout tested beta
-git tag v0.3.0               # Tag without -beta suffix
-git push origin v0.3.0       # Publishes to latest
-```
-
-The GitHub Action automatically:
-
-- Runs tests, typecheck, and linting
-- Builds the project
-- Publishes to npm (`latest` or `beta` channel based on version)
-- Creates a GitHub release
+| Category    | Operations                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Notebooks   | List notebooks<br>Create notebook<br>Get notebook notes<br>Update notebook<br>Delete notebook<br>Get notebook by ID<br>Move note to notebook                                |
+| Notes       | List all notes<br>Search notes<br>Get note<br>Create note<br>Update note<br>Append to note<br>Prepend to note<br>Delete note                                                |
+| Tags        | Add tags to note<br>Remove tags from note<br>List tags<br>Rename tag<br>Delete tag<br>Get tag by ID<br>Get notes by tag                                                     |
+| Attachments | List all resources<br>Get resource metadata<br>Get note attachments<br>Get resource notes<br>Download attachment<br>Upload attachment<br>Update resource<br>Delete resource |
+| Revisions   | List all revisions<br>Get revision                                                                                                                                          |
 
 ## Troubleshooting
-
-### Connection Issues
 
 - Verify Joplin desktop app is running
 - Confirm Web Clipper is enabled in Joplin settings
 - Ensure Joplin is listening on port 41184 (default)
 - If auto-discovery fails, set `JOPLIN_TOKEN` in your environment (add to `.bashrc` or shell config)
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-Apache-2.0
-
-## Links
-
-- [GitHub Repository](https://github.com/belsar-ai/joplin-mcp)
-- [Report Issues](https://github.com/belsar-ai/joplin-mcp/issues)
-- [Joplin Website](https://joplinapp.org/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
+- Go outside for a nice walk
