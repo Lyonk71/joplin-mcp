@@ -456,6 +456,11 @@ RETURNS: Complete note object including:
         name: 'create_note',
         description: `Create a new note in Joplin with title and body content.
 
+NOTEBOOK SELECTION PROTOCOL:
+1. Check the current conversation context for a referenced notebook/folder (e.g., "put this in Work Projects" or the user just asked to browse a specific notebook).
+2. When a notebook is implied or explicitly named, call list_notebooks to resolve its ID and pass it via notebook_id.
+3. If the notebook cannot be determined with high confidence, pause and ask the user which notebook to use instead of guessing or defaulting to a random one.
+
 WORKFLOW FOR SPECIFIC NOTEBOOK PLACEMENT:
 1. If user specifies a notebook/folder name, call list_notebooks first
 2. Find the notebook_id from the results
