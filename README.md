@@ -15,7 +15,7 @@ claude mcp add --transport stdio joplin -- npx -y @belsar-ai/joplin-mcp
 ```
 
 ```bash
-codex mcp add joplin-mcp -- npx -y @belsar-ai/joplin-mcp
+codex mcp add joplin -- npx -y @belsar-ai/joplin-mcp
 ```
 
 ```bash
@@ -33,11 +33,11 @@ claude mcp remove joplin
 ```
 
 ```bash
-codex mcp remove joplin-mcp
+codex mcp remove joplin
 ```
 
 ```bash
-gemini extensions uninstall joplin-mcp
+gemini extensions uninstall joplin
 ```
 
 ## Example Usage
