@@ -456,16 +456,28 @@ RETURNS: Complete note object including:
         name: 'create_note',
         description: `Create a new note in Joplin with title and body content.
 
-NOTEBOOK SELECTION PROTOCOL:
-1. Check the current conversation context for a referenced notebook/folder (e.g., "put this in Work Projects" or the user just asked to browse a specific notebook).
-2. When a notebook is implied or explicitly named, call list_notebooks to resolve its ID and pass it via notebook_id.
-3. If the notebook cannot be determined with high confidence, pause and ask the user which notebook to use instead of guessing or defaulting to a random one.
+⚠️ CRITICAL: ALWAYS SPECIFY A NOTEBOOK - NEVER OMIT notebook_id
 
-WORKFLOW FOR SPECIFIC NOTEBOOK PLACEMENT:
-1. If user specifies a notebook/folder name, call list_notebooks first
-2. Find the notebook_id from the results
-3. Call create_note with the notebook_id parameter
-4. If no notebook specified, omit notebook_id (uses default notebook)
+NOTEBOOK SELECTION PROTOCOL (MANDATORY):
+The notebook_id parameter is REQUIRED. Joplin has no default notebook, so omitting this parameter results in notes being created in arbitrary locations.
+
+WORKFLOW - TWO SCENARIOS:
+
+Scenario A - Notebook is clear from context:
+1. User explicitly named a notebook (e.g., "create a note in Work Projects") OR just browsed a specific notebook
+2. Call list_notebooks to get all notebooks
+3. Find the matching notebook_id from the results
+4. Call create_note with the notebook_id parameter
+
+Scenario B - Notebook is NOT clear from context:
+1. Recognize that you don't know which notebook to use
+2. Ask the user "Which notebook should I create this note in?" (you can list available notebooks to help them choose)
+3. User responds with a notebook name
+4. Call list_notebooks to get all notebooks
+5. Find the matching notebook_id from the results
+6. Call create_note with the notebook_id parameter
+
+In BOTH scenarios, YOU (the server) must call list_notebooks and resolve the notebook name to an ID. The user provides notebook names, not IDs.
 
 TAG CONVENIENCE: Tags specified in the tags parameter are created automatically if they don't exist. No need to call list_tags or verify tag existence first. Just provide comma-separated tag names (e.g., "work,urgent,project-alpha").
 
@@ -497,7 +509,7 @@ RETURNS: Created note object with id and title. Save the id if you need to refer
             notebook_id: {
               type: 'string',
               description:
-                'Optional: ID of the notebook to place the note in (defaults to default notebook)',
+                'REQUIRED: ID of the notebook to place the note in. Call list_notebooks first to resolve the notebook name to an ID. Never omit this parameter.',
             },
             tags: {
               type: 'string',
