@@ -4,7 +4,8 @@ Model Context Protocol (MCP) server for the [Joplin](https://joplinapp.org/) not
 
 Designed by belsar.ai to be easy to install & enjoyable to use.
 
-Quick start video: https://www.youtube.com/watch?v=B3qJa7ycqNM&t=6s
+## Video
+https://www.youtube.com/watch?v=B3qJa7ycqNM&t=6s
 
 ## Quick Start
 
